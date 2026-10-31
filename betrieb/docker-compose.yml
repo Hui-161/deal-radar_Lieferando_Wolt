@@ -1,0 +1,47 @@
+# Betrieb von Deal-Radar auf dem Heimserver.
+#
+#   cd /opt/deal-radar && sudo docker compose -f betrieb/docker-compose.yml up -d --build
+#
+# Erreichbar ausschließlich über 127.0.0.1:8765 des Hosts. Der Haupt-Tunnel
+# (Container `cloudflared`, host-Netz) kommt direkt an diesen Port; von außen
+# führt der Weg nur über den Tunnel und die Cloudflare-Access-Regel davor.
+
+# Fester Projektname: sonst leitet Compose ihn aus dem Ordnernamen "betrieb" ab
+# und landet im selben Projekt (und Netz) wie rbf-mcp.
+name: deal-radar
+
+services:
+  deal-radar:
+    build:
+      context: ..
+      dockerfile: betrieb/Dockerfile
+    image: deal-radar:latest
+    container_name: deal-radar
+    restart: unless-stopped
+
+    ports:
+      # Die Bindung an 127.0.0.1 ist der eigentliche Schutz – ohne sie wäre
+      # der Dienst im ganzen Heimnetz offen.
+      - "127.0.0.1:8765:8765"
+
+    environment:
+      - TZ=Europe/Berlin
+
+    # Braucht nur ausgehendes HTTPS zu Lieferando, Wolt und OpenStreetMap.
+    # Der Speisekarten-Index braucht ~100 MB pro Adresse (bis zu 4 Adressen gleichzeitig).
+    mem_limit: 512m
+    pids_limit: 128
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m
+
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8765/', timeout=3)"]
+      interval: 60s
+      timeout: 5s
+      retries: 3
+      start_period: 10s

@@ -1,457 +1,408 @@
-import json
-import requests
+"""Wolt: venue list per location, rate-limited deal scan, menus and dish search."""
 import threading
 import time
-from uuid import uuid4
 from typing import Optional
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from threading import Lock
+
+import requests
+
+from . import food
+
+_session = requests.Session()
+_session.headers.update({"Accept-Language": "de", "app-language": "de"})
+
+LIST_URL = "https://restaurant-api.wolt.com/v1/pages/restaurants?lat={lat}&lon={lon}"
+SEARCH_URL = "https://restaurant-api.wolt.com/v1/pages/search"
+DYNAMIC_URL = "https://consumer-api.wolt.com/order-xp/web/v1/venue/slug/{slug}/dynamic?language=de"
+ASSORTMENT_URL = "https://consumer-api.wolt.com/consumer-api/consumer-assortment/v1/venues/slug/{slug}/assortment?language=de"
+
+# Wolt allows only about 15-20 requests per minute and IP, shared by all endpoints.
+# The background deal scan runs at ~13 per minute so that searches and menus still get through.
+_MIN_GAP = 1.0
+_SCAN_INTERVAL = 4.5
+_SCAN_MAX_INTERVAL = 12.0
+_INTERACTIVE_MAX_WAIT = 45.0
+
+_CACHE_TTL = 1800
+# Venue deals rarely change within hours; keeping them long makes repeated visits instant
+DEALS_TTL = 6 * 3600
+_list_cache = {}  # (lat, lon) rounded -> (timestamp, result)
+_deals_cache = {}  # slug -> (timestamp, parsed deals)
+_menu_cache = {}  # slug -> (timestamp, menu)
+_cache_lock = threading.Lock()
+
+DEAL_RANK = {"bogof": 0, "free_item": 1, "item_discount": 2}
+_GENERIC_CATEGORIES = ("beliebt", "popular", "angebot", "highlight", "empfehl", "bestseller", "top ", "neu")
 
 
-# Module-level dict to store scans
-_scans = {}
-_scans_lock = Lock()
-
-# In-memory cache for deal items: {slug: (timestamp, offers)}
-_deal_items_cache = {}
-# Raw dynamic responses cached during scans: {slug: (timestamp, data)}
-_dynamic_cache = {}
-_CACHE_TTL = 600
+class WoltBusy(RuntimeError):
+    """Wolt is throttling and the request could not be made in reasonable time."""
 
 
-def _get_json_with_retry(url: str, tries: int = 3) -> dict:
-    """GET JSON, retrying with backoff on 429 rate limits."""
-    for attempt in range(tries):
-        response = requests.get(url, timeout=10, allow_redirects=True)
-        if response.status_code == 429 and attempt < tries - 1:
-            retry_after = response.headers.get("Retry-After")
-            time.sleep(float(retry_after) if retry_after else 2 * (attempt + 1))
+class _Throttle:
+    """
+    Shared pacing for all Wolt requests: a minimum gap between any two requests, a slower lane for
+    the background scan (which yields to waiting interactive requests) and a global pause after HTTP 429.
+    """
+
+    def __init__(self):
+        self._lock = threading.Lock()
+        self._next_any = 0.0
+        self._next_scan = 0.0
+        self._interactive_waiting = 0
+        self.paused_until = 0.0
+        self.scan_interval = _SCAN_INTERVAL
+
+    def wait(self, interactive: bool):
+        deadline = time.time() + _INTERACTIVE_MAX_WAIT
+        if interactive:
+            with self._lock:
+                self._interactive_waiting += 1
+        try:
+            while True:
+                with self._lock:
+                    now = time.time()
+                    blocked_until = max(self.paused_until, self._next_any)
+                    if not interactive:
+                        blocked_until = max(blocked_until, self._next_scan)
+                        if self._interactive_waiting:
+                            blocked_until = max(blocked_until, now + 0.25)
+                    if now >= blocked_until:
+                        self._next_any = now + _MIN_GAP
+                        if not interactive:
+                            self._next_scan = now + self.scan_interval
+                        return
+                    delay = blocked_until - now
+                if interactive and now + delay > deadline:
+                    raise WoltBusy("Wolt bremst gerade – bitte in einer Minute erneut versuchen")
+                time.sleep(min(delay, 0.5))
+        finally:
+            if interactive:
+                with self._lock:
+                    self._interactive_waiting -= 1
+
+    def back_off(self, seconds: float):
+        with self._lock:
+            self.paused_until = max(self.paused_until, time.time() + seconds)
+            self.scan_interval = min(self.scan_interval * 1.5, _SCAN_MAX_INTERVAL)
+
+    def success(self):
+        with self._lock:
+            self.scan_interval = max(_SCAN_INTERVAL, self.scan_interval * 0.97)
+
+    @property
+    def paused(self) -> bool:
+        return time.time() < self.paused_until
+
+
+_throttle = _Throttle()
+
+
+def throttled() -> bool:
+    return _throttle.paused
+
+
+def _request_json(url: str, interactive: bool, body: Optional[dict] = None, tries: Optional[int] = None) -> dict:
+    """GET (or POST with body) through the shared throttle; on 429 honour Retry-After and retry."""
+    backoff = 5.0
+    for _ in range(tries or (3 if interactive else 6)):
+        _throttle.wait(interactive)
+        if body is None:
+            response = _session.get(url, timeout=15)
+        else:
+            response = _session.post(url, json=body, timeout=15)
+        if response.status_code == 429:
+            try:
+                wait = float(response.headers.get("Retry-After"))
+            except (TypeError, ValueError):
+                wait = backoff
+            _throttle.back_off(min(wait, 60.0))
+            backoff = min(backoff * 2, 60.0)
             continue
         response.raise_for_status()
+        _throttle.success()
         return response.json()
-    raise RuntimeError("unreachable")
+    raise WoltBusy("Wolt drosselt die Anfragen weiterhin (HTTP 429)")
 
 
-def _get_dynamic(slug: str) -> dict:
-    """Fetch a venue's dynamic data, reusing responses cached during scans."""
-    cached = _dynamic_cache.get(slug)
-    if cached and time.time() - cached[0] < _CACHE_TTL:
-        return cached[1]
-    url = f"https://consumer-api.wolt.com/order-xp/web/v1/venue/slug/{slug}/dynamic?language=de"
-    data = _get_json_with_retry(url)
-    _dynamic_cache[slug] = (time.time(), data)
-    return data
+def _cached(cache: dict, key, ttl: float = _CACHE_TTL):
+    entry = cache.get(key)
+    return entry[1] if entry and time.time() - entry[0] < ttl else None
 
 
-def _round_rating(score: float) -> float:
-    """Convert Wolt rating (0-10) to 5-star scale and round to 1 decimal place."""
-    if score is None:
+def _store(cache: dict, key, value, max_entries: int = 500, ttl: float = _CACHE_TTL):
+    with _cache_lock:
+        if len(cache) >= max_entries:
+            cutoff = time.time() - ttl
+            for k in [k for k, (ts, _) in cache.items() if ts < cutoff] or list(cache)[: max_entries // 5]:
+                cache.pop(k, None)
+        cache[key] = (time.time(), value)
+
+
+def _image(url: Optional[str], width: int) -> Optional[str]:
+    return f"{url}?w={width}" if url and "?" not in url else url
+
+
+# --- Venue list ---
+
+def _normalize_venue(entry: dict, lat: float, lon: float, city: str) -> Optional[dict]:
+    venue = entry.get("venue") or {}
+    slug = venue.get("slug")
+    if not slug:
         return None
-    rating_5 = score / 2
-    return round(rating_5, 1)
-
-
-def _parse_venue_list(data: dict, limit: int) -> list[dict]:
-    """Extract venues from Wolt venue list response."""
-    venues = []
-
-    sections = data.get("sections", [])
-    for section in sections:
-        if section.get("name") == "restaurants-delivering-venues":
-            items = section.get("items", [])
-            for item in items:
-                venue_data = item.get("venue", {})
-                sorting = item.get("sorting", {})
-
-                # Get distance for sorting
-                sortables = sorting.get("sortables", [])
-                distance = float("inf")
-                for sortable in sortables:
-                    if sortable.get("id") == "distance":
-                        distance = sortable.get("value", float("inf"))
-                        break
-
-                venues.append({
-                    "data": venue_data,
-                    "distance": distance
-                })
-
-    # Sort by distance and take first 'limit'
-    venues.sort(key=lambda x: x["distance"])
-    return venues[:limit]
-
-
-def _get_banner_texts(data: dict) -> dict:
-    """Extract banner texts keyed by discount_id from dynamic response."""
-    banner_texts = {}
-    for banner in data.get("venue", {}).get("banners", []):
-        bd = banner.get("discount") or {}
-        if bd.get("discount_id") and bd.get("formatted_text"):
-            banner_texts[bd["discount_id"]] = bd["formatted_text"]
-    return banner_texts
-
-
-def _parse_dynamic_response(data: dict, venue_data: dict, city_slug: str) -> Optional[dict]:
-    """Parse venue dynamic response and extract deals."""
-    if not data:
-        return None
-
-    venue_raw = data.get("venue_raw", {})
-    deals = []
-
-    # Banner texts are the human-readable descriptions, keyed by discount id
-    banner_texts = _get_banner_texts(data)
-
-    for discount in venue_raw.get("discounts", []):
-        effects = discount.get("effects", {})
-        deal_text = banner_texts.get(discount.get("id", ""), "")
-
-        item_discount = effects.get("item_discount")
-        free_items = effects.get("free_items")
-
-        if free_items or (item_discount and item_discount.get("fraction") == 1.0):
-            deals.append({
-                "type": "bogof",
-                "text": deal_text or "2 für 1 / Gratis-Artikel"
-            })
-            continue
-
-        if item_discount:
-            if not deal_text:
-                fraction = item_discount.get("fraction")
-                if fraction:
-                    deal_text = f"{int(fraction * 100)} % auf ausgewählte Gerichte"
-                elif item_discount.get("amount_per_item"):
-                    deal_text = f"{item_discount['amount_per_item'] / 100:.2f} € Rabatt pro Gericht"
-                else:
-                    deal_text = "Rabatt auf ausgewählte Gerichte"
-            deals.append({
-                "type": "item_discount",
-                "text": deal_text
-            })
-            continue
-
-        basket_discount = effects.get("basket_discount")
-        if basket_discount:
-            if not deal_text:
-                if basket_discount.get("amount"):
-                    deal_text = f"{basket_discount['amount'] / 100:.0f} € Rabatt"
-                elif basket_discount.get("fraction"):
-                    deal_text = f"{int(basket_discount['fraction'] * 100)} % auf den Warenkorb"
-                else:
-                    deal_text = "Warenkorb-Rabatt"
-            deals.append({
-                "type": "basket_discount",
-                "text": deal_text
-            })
-            continue
-
-        delivery_discount = effects.get("delivery_discount")
-        if delivery_discount:
-            deals.append({
-                "type": "free_delivery",
-                "text": deal_text or "Gratis Lieferung"
-            })
-            continue
-
-    if not deals:
-        return None
-
-    # Extract rating
-    rating_data = venue_data.get("rating", {})
-    rating_score = rating_data.get("score") if rating_data else None
-    rating = _round_rating(rating_score)
-    rating_count = rating_data.get("volume", 0) if rating_data else 0
-
-    # Extract ETA
-    estimate_range = venue_data.get("estimate_range", "")
-
-    # Extract city slug (or use provided fallback)
-    city_slug_venue = venue_data.get("city", "")
-    if not city_slug_venue:
-        city_slug_venue = city_slug
-
-    # Build link
-    slug = venue_data.get("slug", "")
-    link = f"https://wolt.com/de/deu/{city_slug_venue}/restaurant/{slug}" if slug else ""
-
+    primary = [
+        value
+        for f in (entry.get("filtering") or {}).get("filters") or []
+        if f.get("id") == "primary"
+        for value in f.get("values") or []
+    ]
+    rating = venue.get("rating") or {}
+    score = rating.get("score")
+    location = venue.get("location") or [None, None]
+    badges = [b.get("text") for b in venue.get("badges") or [] if b.get("text")]
     return {
+        "id": f"w:{slug}",
         "source": "wolt",
-        "name": venue_data.get("name", ""),
-        "link": link,
         "slug": slug,
-        "rating": rating,
-        "rating_count": rating_count,
-        "eta": estimate_range,
-        "delivery_fee_cents": 0,  # Wolt doesn't provide this in the dynamic response
-        "min_order_cents": 0,      # Wolt doesn't provide this in the dynamic response
-        "open_now": venue_data.get("online", False),
-        "deals": deals
+        "rid": venue.get("id"),
+        "name": venue.get("name", ""),
+        "link": f"https://wolt.com/de/deu/{city}/restaurant/{slug}",
+        "logo": _image((venue.get("brand_image") or {}).get("url"), 160),
+        "img": _image((entry.get("image") or {}).get("url"), 640),
+        "cuisines": food.wolt_cuisines(primary),
+        "tags": [t.strip() for t in venue.get("tags") or [] if t.strip()][:4],
+        "diet": [d for d in ("vegan", "vegetarian") if d in primary],
+        "halal": "halal" in primary,
+        "shop": venue.get("product_line") not in (None, "restaurant"),
+        "rating": round(score / 2, 1) if isinstance(score, (int, float)) else None,
+        "rating_count": rating.get("volume") or 0,
+        "eta": venue.get("estimate_range") or "",
+        "eta_min": food.eta_min(venue.get("estimate_range")),
+        "delivery_fee_cents": None,  # not part of the public venue data
+        "min_order_cents": None,  # comes with the deal scan
+        "open_now": bool(venue.get("online")) and venue.get("delivers") is not False,
+        "opens_at": None,
+        "distance_m": food.distance_m(lat, lon, location[1], location[0]),
+        "is_new": "Neu" in badges,
+        "badges": [b for b in badges if b != "Neu"][:2],
+        "deals": None,  # unknown until the deal scan reached the venue
     }
 
 
-def _fetch_venue_dynamic(slug: str, city_slug: str, venue_data: dict) -> Optional[dict]:
-    """Fetch and parse dynamic data for a single venue."""
-    try:
-        data = _get_dynamic(slug)
-        return _parse_dynamic_response(data, venue_data, city_slug)
-    except Exception:
-        # Silently skip this venue if there's any error
-        return None
+def fetch_restaurants(lat: float, lon: float) -> tuple[list[dict], str, dict]:
+    """All venues delivering to a location: (restaurants, city slug, preview items per slug)."""
+    key = (round(lat, 3), round(lon, 3))
+    cached = _cached(_list_cache, key, 600)
+    if cached:
+        return cached
 
-
-def _scan_venues_background(scan_id: str, lat: float, lon: float, limit: int, city_slug: str):
-    """Background task to scan venues and fetch their dynamic data."""
-    try:
-        # Fetch venue list
-        list_url = f"https://restaurant-api.wolt.com/v1/pages/restaurants?lat={lat}&lon={lon}"
-        list_response = requests.get(list_url, timeout=10)
-        list_response.raise_for_status()
-        list_data = list_response.json()
-
-        # Actual city slug for venue links comes from the list response
-        city_slug = list_data.get("city") or city_slug
-
-        # Parse venue list
-        venues = _parse_venue_list(list_data, limit)
-        total = len(venues)
-
-        # Update scan with total
-        with _scans_lock:
-            if scan_id in _scans:
-                _scans[scan_id]["total"] = total
-
-        # Use ThreadPoolExecutor to fetch dynamic data for all venues
-        processed = 0
-        with ThreadPoolExecutor(max_workers=8) as executor:
-            futures = [
-                executor.submit(
-                    _fetch_venue_dynamic,
-                    venue_info["data"].get("slug", ""),
-                    city_slug,
-                    venue_info["data"],
-                )
-                for venue_info in venues
-            ]
-
-            for future in as_completed(futures):
-                try:
-                    result = future.result()
-                except Exception:
-                    result = None
-                processed += 1
-                with _scans_lock:
-                    if scan_id in _scans:
-                        _scans[scan_id]["scanned"] = processed
-                        if result:
-                            _scans[scan_id]["restaurants"].append(result)
-
-        # Mark scan as done
-        with _scans_lock:
-            if scan_id in _scans:
-                _scans[scan_id]["done"] = True
-
-    except Exception:
-        # Mark scan as done even if there's an error
-        with _scans_lock:
-            if scan_id in _scans:
-                _scans[scan_id]["done"] = True
-
-
-def start_scan(lat: float, lon: float, limit: int, city_slug: str = "berlin") -> str:
-    """
-    Start a non-blocking scan of Wolt venues in the given area.
-
-    Args:
-        lat: Latitude
-        lon: Longitude
-        limit: Maximum number of venues to scan
-        city_slug: City slug for link generation (default: "berlin")
-
-    Returns:
-        Scan ID (UUID hex)
-    """
-    scan_id = uuid4().hex
-
-    # Initialize scan data
-    with _scans_lock:
-        _scans[scan_id] = {
-            "done": False,
-            "scanned": 0,
-            "total": 0,
-            "restaurants": []
-        }
-
-    # Start background thread
-    thread = threading.Thread(
-        target=_scan_venues_background,
-        args=(scan_id, lat, lon, limit, city_slug),
-        daemon=True
-    )
-    thread.start()
-
-    return scan_id
-
-
-def get_scan(scan_id: str) -> Optional[dict]:
-    """
-    Get the current status and results of a scan.
-
-    Args:
-        scan_id: Scan ID from start_scan()
-
-    Returns:
-        Dict with keys: done, scanned, total, restaurants
-        Returns None if scan_id not found.
-    """
-    with _scans_lock:
-        if scan_id not in _scans:
-            return None
-
-        # Return a copy to avoid race conditions
-        scan_data = _scans[scan_id]
-        return {
-            "done": scan_data["done"],
-            "scanned": scan_data["scanned"],
-            "total": scan_data["total"],
-            "restaurants": list(scan_data["restaurants"])  # Make a copy of the list
-        }
-
-
-def fetch_deal_items(slug: str) -> list[dict]:
-    """
-    Fetch deal items for a specific Wolt restaurant.
-
-    Args:
-        slug: Restaurant slug
-
-    Returns:
-        List of offer dicts with items. Raises Exception on error (app.py catches).
-    """
-    # Check cache
-    if slug in _deal_items_cache:
-        timestamp, cached_offers = _deal_items_cache[slug]
-        if time.time() - timestamp < _CACHE_TTL:
-            return cached_offers
-
-    # 1. Dynamic data (discounts + banner texts), reused from scan cache if fresh
-    dynamic_data = _get_dynamic(slug)
-
-    # 2. Assortment data (item names and prices)
-    assortment_url = f"https://consumer-api.wolt.com/consumer-api/consumer-assortment/v1/venues/slug/{slug}/assortment?language=de"
-    assortment_data = _get_json_with_retry(assortment_url)
-
-    # Build item lookup dict: {item_id: {name, price, original_price}}
-    items_dict = {}
-    for item in assortment_data.get("items", []):
-        item_id = item.get("id")
-        if item_id:
-            items_dict[item_id] = {
-                "name": item.get("name", ""),
-                "price": item.get("price"),
-                "original_price": item.get("original_price")
-            }
-
-    # Extract banner texts
-    banner_texts = _get_banner_texts(dynamic_data)
-
-    # Extract discounts and build offers
-    venue_raw = dynamic_data.get("venue_raw", {})
-    offers_list = []
-
-    for discount in venue_raw.get("discounts", []):
-        effects = discount.get("effects") or {}
-        deal_text = banner_texts.get(discount.get("id", ""), "")
-
-        item_discount = effects.get("item_discount")
-        free_items = effects.get("free_items")
-        basket_discount = effects.get("basket_discount")
-        delivery_discount = effects.get("delivery_discount")
-
-        # Collect item IDs this offer applies to (bogof/item_discount only)
-        item_ids_to_include = []
-        for effect in (free_items, item_discount):
-            include = (effect or {}).get("include") or {}
-            item_ids_to_include.extend(include.get("items") or [])
-
-        # Same type precedence as _parse_dynamic_response
-        if free_items or (item_discount and item_discount.get("fraction") == 1.0):
-            offer_type = "bogof"
-            discount_percentage = 100
-            deal_text = deal_text or "2 für 1 / Gratis-Artikel"
-        elif item_discount:
-            offer_type = "item_discount"
-            fraction = item_discount.get("fraction")
-            discount_percentage = round(fraction * 100) if fraction else None
-            if not deal_text:
-                if fraction:
-                    deal_text = f"{int(fraction * 100)} % auf ausgewählte Gerichte"
-                elif item_discount.get("amount_per_item"):
-                    deal_text = f"{item_discount['amount_per_item'] / 100:.2f} € Rabatt pro Gericht"
-                else:
-                    deal_text = "Rabatt auf ausgewählte Gerichte"
-        elif basket_discount:
-            offer_type = "basket_discount"
-            discount_percentage = None
-            if not deal_text:
-                if basket_discount.get("amount"):
-                    deal_text = f"{basket_discount['amount'] / 100:.0f} € Rabatt"
-                elif basket_discount.get("fraction"):
-                    deal_text = f"{int(basket_discount['fraction'] * 100)} % auf den Warenkorb"
-                else:
-                    deal_text = "Warenkorb-Rabatt"
-        elif delivery_discount:
-            offer_type = "free_delivery"
-            discount_percentage = None
-            deal_text = deal_text or "Gratis Lieferung"
-        else:
+    data = _request_json(LIST_URL.format(lat=lat, lon=lon), interactive=True)
+    city = data.get("city") or "berlin"
+    restaurants, previews = [], {}
+    for section in data.get("sections") or []:
+        if section.get("name") != "restaurants-delivering-venues":
             continue
+        for entry in section.get("items") or []:
+            rest = _normalize_venue(entry, lat, lon, city)
+            if not rest:
+                continue
+            restaurants.append(rest)
+            items = []
+            for p in (entry.get("venue") or {}).get("venue_preview_items") or []:
+                if p.get("id") and p.get("name"):
+                    items.append(food.make_item(
+                        p["id"], p["name"], "", p.get("price"), None,
+                        _image((p.get("image") or {}).get("url"), 400), "", (), rest["name"],
+                    ))
+            if items:
+                previews[rest["slug"]] = items
+    result = (restaurants, city, previews)
+    _store(_list_cache, key, result, 50)
+    return result
 
-        # Build items for this offer (dedupe variants sharing name + price)
-        items = []
-        seen = set()
-        for item_id in item_ids_to_include:
-            if item_id in items_dict:
-                item_info = items_dict[item_id]
-                key = (item_info.get("name", ""), item_info.get("price"))
-                if key in seen:
-                    continue
-                seen.add(key)
-                item_dict = {
-                    "name": item_info.get("name", ""),
-                    "price_cents": item_info.get("price")
-                }
-                if discount_percentage is not None:
-                    item_dict["discount_percentage"] = discount_percentage
-                items.append(item_dict)
 
-        offers_list.append({
-            "type": offer_type,
-            "text": deal_text,
-            "items": items
-        })
+# --- Deals (venue "dynamic" data) ---
 
-    # Add synthetic offer for directly reduced items (original_price > price)
-    reduced_items = []
-    for item_id, item_info in items_dict.items():
-        price = item_info.get("price")
-        original_price = item_info.get("original_price")
-        if original_price and price and original_price > price:
-            discount_pct = round((1 - price / original_price) * 100)
-            reduced_items.append({
-                "name": item_info.get("name", ""),
-                "price_cents": price,
-                "discount_percentage": discount_pct
-            })
+def cached_deals(slug: str) -> Optional[dict]:
+    """Deals of a venue if they are still in the cache (no request)."""
+    return _cached(_deals_cache, slug, DEALS_TTL)
 
-    if reduced_items:
-        offers_list.append({
-            "type": "item_discount",
-            "text": "Direkt reduzierte Gerichte",
-            "items": reduced_items
-        })
 
-    # Cache result
-    _deal_items_cache[slug] = (time.time(), offers_list)
+def get_deals(slug: str, interactive: bool) -> dict:
+    """Parsed deals of a venue (see parse_dynamic), from the cache or one throttled request."""
+    cached = cached_deals(slug)
+    if cached is not None:
+        return cached
+    parsed = parse_dynamic(_request_json(DYNAMIC_URL.format(slug=slug), interactive=interactive))
+    _store(_deals_cache, slug, parsed, 3000, DEALS_TTL)
+    return parsed
 
-    return offers_list
+
+def _banner_texts(data: dict) -> dict:
+    """Human-readable discount descriptions, keyed by discount id."""
+    texts = {}
+    for banner in (data.get("venue") or {}).get("banners") or []:
+        bd = banner.get("discount") or {}
+        if bd.get("discount_id") and bd.get("formatted_text"):
+            texts[bd["discount_id"]] = bd["formatted_text"]
+    return texts
+
+
+def _discount_deal(discount: dict, texts: dict) -> Optional[tuple[dict, list]]:
+    effects = discount.get("effects") or {}
+    text = texts.get(discount.get("id", ""), "")
+    item_discount = effects.get("item_discount")
+    free_items = effects.get("free_items")
+    item_ids = []
+    for effect in (free_items, item_discount):
+        include = (effect or {}).get("include") or {}
+        item_ids.extend(include.get("items") or [])
+
+    if free_items or (item_discount and item_discount.get("fraction") == 1.0):
+        return {"type": "bogof", "text": text or "2 für 1 / Gratis-Artikel", "pct": 100}, item_ids
+    if item_discount:
+        fraction = item_discount.get("fraction")
+        if not text:
+            if fraction:
+                text = f"{int(fraction * 100)} % auf ausgewählte Gerichte"
+            elif item_discount.get("amount_per_item"):
+                text = f"{item_discount['amount_per_item'] / 100:.2f} € Rabatt pro Gericht".replace(".", ",")
+            else:
+                text = "Rabatt auf ausgewählte Gerichte"
+        return {"type": "item_discount", "text": text, "pct": round(fraction * 100) if fraction else None}, item_ids
+    basket = effects.get("basket_discount")
+    if basket:
+        if not text:
+            if basket.get("amount"):
+                text = f"{basket['amount'] / 100:.0f} € Rabatt"
+            elif basket.get("fraction"):
+                text = f"{int(basket['fraction'] * 100)} % auf den Warenkorb"
+            else:
+                text = "Warenkorb-Rabatt"
+        return {"type": "basket_discount", "text": text, "pct": None}, []
+    if effects.get("delivery_discount"):
+        return {"type": "free_delivery", "text": text or "Gratis Lieferung", "pct": None}, []
+    return None
+
+
+def parse_dynamic(data: dict) -> dict:
+    """Venue deals, the deal per item id and the minimum order value."""
+    texts = _banner_texts(data)
+    deals, item_deals = [], {}
+    for discount in (data.get("venue_raw") or {}).get("discounts") or []:
+        parsed = _discount_deal(discount, texts)
+        if not parsed:
+            continue
+        deal, item_ids = parsed
+        deals.append({"type": deal["type"], "text": deal["text"]})
+        for item_id in item_ids:
+            current = item_deals.get(item_id)
+            if current is None or DEAL_RANK.get(deal["type"], 9) < DEAL_RANK.get(current["type"], 9):
+                item_deals[item_id] = deal
+    order_minimum = data.get("order_minimum")
+    return {
+        "deals": deals,
+        "item_deals": item_deals,
+        "min_order_cents": order_minimum if isinstance(order_minimum, int) else None,
+    }
+
+
+# --- Menu ---
+
+def fetch_menu(slug: str, restaurant_name: str = "") -> dict:
+    """Full menu of a venue incl. diet, kind and deals per item. Raises on error (callers catch)."""
+    cached = _cached(_menu_cache, slug)
+    if cached is not None:
+        return cached
+
+    dynamic = get_deals(slug, interactive=True)
+    data = _request_json(ASSORTMENT_URL.format(slug=slug), interactive=True)
+
+    # Flatten categories (they may contain subcategories) and pick a specific category per item
+    categories, item_category = [], {}
+
+    def add_category(cat: dict, prefix: str = ""):
+        name = (cat.get("name") or "").strip()
+        full_name = f"{prefix} · {name}" if prefix and name else (name or prefix)
+        ids = [i for i in cat.get("item_ids") or [] if i]
+        if ids:
+            categories.append({"name": full_name, "ids": ids})
+            generic = any(g in full_name.lower() for g in _GENERIC_CATEGORIES)
+            for item_id in ids:
+                if item_id not in item_category or (not generic and item_category[item_id][1]):
+                    item_category[item_id] = (full_name, generic)
+        for sub in cat.get("subcategories") or []:
+            add_category(sub, name)
+
+    for cat in data.get("categories") or []:
+        add_category(cat)
+
+    items = {}
+    for raw in data.get("items") or []:
+        item_id = raw.get("id")
+        if not item_id or not isinstance(raw.get("price"), int):
+            continue
+        labels = [str(p) for p in raw.get("dietary_preferences") or []]
+        if raw.get("alcohol_permille"):
+            labels.append("alcohol")
+        image = (raw.get("images") or [{}])[0].get("url")
+        item = food.make_item(
+            item_id, raw.get("name"), raw.get("description"), raw["price"], raw.get("original_price"),
+            _image(image, 400), item_category.get(item_id, ("", False))[0], labels, restaurant_name,
+        )
+        deal = dynamic["item_deals"].get(item_id)
+        if deal:
+            item["deal"] = dict(deal)
+        elif item["orig_price_cents"]:
+            pct = round((1 - item["price_cents"] / item["orig_price_cents"]) * 100)
+            item["deal"] = {"type": "item_discount", "text": "Direkt reduziert", "pct": pct}
+        if raw.get("disabled_info"):
+            item["sold_out"] = True
+        items[item_id] = item
+
+    for cat in categories:
+        cat["ids"] = [i for i in dict.fromkeys(cat["ids"]) if i in items]
+    menu = {
+        "slug": slug,
+        "banner": None,
+        "description": "",
+        "categories": [c for c in categories if c["ids"]],
+        "items": items,
+        "offers": dynamic["deals"],
+        "min_order_cents": dynamic["min_order_cents"],
+        "dynamic": dynamic,
+    }
+    _store(_menu_cache, slug, menu, 200)
+    return menu
+
+
+# --- Dish search ---
+
+def search_items(query: str, lat: float, lon: float) -> list[tuple[dict, dict]]:
+    """Wolt's own dish search around a location (up to ~200 hits): [(venue, item)]."""
+    data = _request_json(SEARCH_URL, interactive=True, body={"q": query, "target": "items", "lat": lat, "lon": lon})
+    results = []
+    for section in data.get("sections") or []:
+        for entry in section.get("items") or []:
+            menu_item = entry.get("menu_item")
+            details = (entry.get("link") or {}).get("menu_item_details") or {}
+            slug = details.get("venue_slug")
+            if not menu_item or not slug or details.get("product_line", "restaurant") != "restaurant":
+                continue
+            item = food.make_item(
+                menu_item.get("id"), menu_item.get("name"), details.get("description"), menu_item.get("price"),
+                menu_item.get("original_price"), _image((menu_item.get("image") or {}).get("url"), 400), "", (),
+                details.get("venue_name", ""),
+            )
+            if menu_item.get("is_available") is False:
+                item["sold_out"] = True
+            rating = (details.get("venue_rating") or {}).get("score")
+            venue = {
+                "slug": slug,
+                "name": details.get("venue_name") or menu_item.get("venue_name") or "",
+                "city": details.get("city_slug") or "berlin",
+                "rating": round(rating / 2, 1) if isinstance(rating, (int, float)) else None,
+                "eta": details.get("estimate_range") or menu_item.get("estimate_range") or "",
+                "logo": _image((details.get("venue_image") or {}).get("url"), 160),
+            }
+            results.append((venue, item))
+    return results

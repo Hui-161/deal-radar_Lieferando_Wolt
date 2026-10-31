@@ -2,1071 +2,1267 @@
 <html lang="de">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="referrer" content="no-referrer">
+  <meta name="theme-color" content="#f5f5f2" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#111113" media="(prefers-color-scheme: dark)">
   <title>Deal-Radar</title>
   <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-
     :root {
-      --bg-primary: #ffffff;
-      --bg-secondary: #f5f5f5;
-      --text-primary: #1a1a1a;
-      --text-secondary: #666666;
-      --border-color: #e0e0e0;
-      --accent-primary: #ff6b35;
-      --badge-bogof: #ffc107;
-      --badge-lieferando: #ff8000;
-      --badge-wolt: #009de0;
-      --spinner-color: #ff6b35;
+      --bg: #f5f5f2;
+      --card: #ffffff;
+      --text: #1c1c1e;
+      --muted: #6e6e73;
+      --line: #e6e5e0;
+      --soft: #efeee9;
+      --chip: #ffffff;
+      --chip-on: #1c1c1e;
+      --chip-on-text: #ffffff;
+      --deal: #e0430b;
+      --deal-soft: #fff0e7;
+      --star: #f2a516;
+      --lief: #ff8000;
+      --wolt: #009de0;
+      --uber: #06a15a;
+      --veg: #2e7d32;
+      --veg-soft: #e7f4e8;
+      --vegan: #0d7a5c;
+      --vegan-soft: #ddf3ec;
+      --focus: #2563eb;
+      --shadow: 0 1px 2px rgba(0, 0, 0, .05), 0 6px 18px rgba(0, 0, 0, .06);
+      --radius: 16px;
+      --nav-h: 0px;
+      --safe-b: env(safe-area-inset-bottom, 0px);
     }
 
     @media (prefers-color-scheme: dark) {
       :root {
-        --bg-primary: #1a1a1a;
-        --bg-secondary: #2d2d2d;
-        --text-primary: #f0f0f0;
-        --text-secondary: #b0b0b0;
-        --border-color: #404040;
-        --accent-primary: #ff8a50;
-        --badge-bogof: #ffd700;
-        --badge-lieferando: #ff8000;
-        --badge-wolt: #00b8e6;
+        --bg: #111113;
+        --card: #1c1c1f;
+        --text: #f2f2f4;
+        --muted: #a2a2a9;
+        --line: #2e2e33;
+        --soft: #25252a;
+        --chip: #1c1c1f;
+        --chip-on: #f2f2f4;
+        --chip-on-text: #111113;
+        --deal: #ff6d36;
+        --deal-soft: #3b2117;
+        --veg: #82c784;
+        --veg-soft: #1e3321;
+        --vegan: #55d3a8;
+        --vegan-soft: #15322a;
+        --focus: #60a5fa;
+        --shadow: 0 1px 2px rgba(0, 0, 0, .5);
       }
     }
 
-    html, body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-      color: var(--text-primary);
-      background-color: var(--bg-primary);
-      transition: background-color 0.2s, color 0.2s;
-    }
-
+    * { box-sizing: border-box; }
+    html { -webkit-text-size-adjust: 100%; }
     body {
-      padding: 16px;
-      max-width: 1200px;
-      margin: 0 auto;
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      padding-bottom: calc(var(--nav-h) + var(--safe-b));
     }
+    body.locked { overflow: hidden; }
+    button, input, select { font: inherit; color: inherit; -webkit-tap-highlight-color: transparent; }
+    button { cursor: pointer; touch-action: manipulation; }
+    :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+    [hidden] { display: none !important; }
+    .wrap { max-width: 1280px; margin: 0 auto; padding: 0 16px; }
 
-    header {
-      margin-bottom: 32px;
+    /* Header */
+    .top { background: var(--card); border-bottom: 1px solid var(--line); }
+    .top .wrap { display: flex; align-items: center; gap: 16px; padding-top: 12px; padding-bottom: 12px; flex-wrap: wrap; }
+    .brand { font-weight: 800; font-size: 20px; letter-spacing: -.02em; white-space: nowrap; }
+    .brand span { color: var(--deal); }
+    #addr-form { flex: 1 1 420px; display: flex; gap: 8px; min-width: 0; }
+    .addr-field { flex: 1; position: relative; min-width: 0; }
+    .addr-field::before { content: "📍"; position: absolute; left: 12px; top: 50%; transform: translateY(-50%); font-size: 15px; }
+    #addr {
+      width: 100%; height: 42px; padding: 0 12px 0 36px; border-radius: 999px;
+      border: 1px solid var(--line); background: var(--bg);
     }
-
-    h1 {
-      font-size: 28px;
-      font-weight: 600;
-      margin-bottom: 24px;
+    .addr-chip { display: none; flex: 1; min-width: 0; align-items: center; gap: 6px; height: 36px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--bg); font-size: 14px; text-align: left; }
+    .addr-chip span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .addr-chip b { color: var(--deal); font-weight: 600; font-size: 13px; }
+    .btn {
+      height: 42px; padding: 0 18px; border-radius: 999px; border: 0;
+      background: var(--chip-on); color: var(--chip-on-text); font-weight: 600; white-space: nowrap;
     }
+    .btn.ghost { background: var(--soft); color: var(--text); padding: 0 14px; }
+    .btn:disabled { opacity: .6; cursor: default; }
 
-    .search-section {
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-      margin-bottom: 24px;
-    }
+    /* Welcome */
+    .welcome { padding: 56px 0 80px; text-align: center; }
+    .welcome h1 { font-size: clamp(28px, 5vw, 44px); letter-spacing: -.03em; margin: 0 0 12px; }
+    .welcome p { color: var(--muted); max-width: 640px; margin: 0 auto 8px; }
+    .welcome .hints { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-top: 28px; }
+    .welcome .hint { background: var(--card); border: 1px solid var(--line); border-radius: 999px; padding: 8px 14px; font-size: 14px; }
+    .msg { margin: 16px 0; padding: 12px 16px; border-radius: 12px; background: var(--deal-soft); color: var(--text); }
 
-    .search-row {
-      display: flex;
-      gap: 12px;
-      flex-wrap: wrap;
-      align-items: flex-end;
-    }
+    /* Sticky search bar; cuisines and filters scroll away with the page */
+    .toolbar { position: sticky; top: 0; z-index: 20; background: var(--bg); padding: 12px 0 8px; }
+    .toolbar .row { display: flex; gap: 12px; align-items: center; }
+    .tabs { display: inline-flex; background: var(--soft); border-radius: 999px; padding: 4px; flex: none; }
+    .tabs button { border: 0; background: none; padding: 8px 16px; border-radius: 999px; font-weight: 600; color: var(--muted); display: inline-flex; align-items: center; gap: 6px; }
+    .tabs button .ti { display: none; }
+    .tabs button[aria-selected="true"] { background: var(--card); color: var(--text); box-shadow: var(--shadow); }
+    .search { flex: 1; position: relative; min-width: 0; }
+    .search::before { content: ""; position: absolute; left: 14px; top: 50%; width: 14px; height: 14px; transform: translateY(-60%); border: 2px solid var(--muted); border-radius: 50%; }
+    .search::after { content: ""; position: absolute; left: 26px; top: 58%; width: 7px; height: 2px; background: var(--muted); transform: rotate(45deg); }
+    #q { width: 100%; height: 44px; border-radius: 999px; border: 1px solid var(--line); background: var(--card); padding: 0 16px 0 42px; font-size: 16px; }
 
-    input[type="text"] {
-      flex: 1;
-      min-width: 150px;
-      padding: 10px 12px;
-      border: 1px solid var(--border-color);
-      border-radius: 6px;
-      background-color: var(--bg-primary);
-      color: var(--text-primary);
-      font-size: 14px;
-    }
+    .cuisines { display: flex; gap: 6px; overflow-x: auto; padding: 6px 0 6px; scrollbar-width: thin; scroll-snap-type: x proximity; -webkit-overflow-scrolling: touch; }
+    .cz { flex: none; display: flex; flex-direction: column; align-items: center; gap: 4px; width: 84px; border: 0; background: none; padding: 4px 2px; scroll-snap-align: start; border-radius: 12px; }
+    .cz .ic { width: 52px; height: 52px; border-radius: 50%; display: grid; place-items: center; font-size: 26px; background: var(--card); border: 1px solid var(--line); transition: transform .15s; }
+    .cz .lb { font-size: 12px; line-height: 1.2; text-align: center; color: var(--muted); }
+    .cz[aria-pressed="true"] .ic { background: var(--chip-on); border-color: var(--chip-on); }
+    .cz[aria-pressed="true"] .lb { color: var(--text); font-weight: 700; }
 
-    input[type="text"]:focus {
-      outline: none;
-      border-color: var(--accent-primary);
-      box-shadow: 0 0 0 2px rgba(255, 107, 53, 0.1);
-    }
-
-    button {
-      padding: 10px 24px;
-      border: none;
-      border-radius: 6px;
-      background-color: var(--accent-primary);
-      color: white;
-      font-size: 14px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: background-color 0.2s;
-    }
-
-    button:hover {
-      background-color: #ff5a22;
-    }
-
-    button:active {
-      background-color: #e64b1a;
-    }
-
-    .toggle-group {
-      display: flex;
-      gap: 8px;
-      align-items: center;
-      flex-wrap: wrap;
-    }
-
-    .toggle-btn {
-      padding: 8px 16px;
-      background-color: var(--bg-secondary);
-      border: 1px solid var(--border-color);
-      border-radius: 6px;
-      color: var(--text-primary);
-      font-size: 13px;
-      cursor: pointer;
-      transition: background-color 0.2s, border-color 0.2s;
-    }
-
-    .toggle-btn.active {
-      background-color: var(--accent-primary);
-      color: white;
-      border-color: var(--accent-primary);
-    }
-
-    .filter-section {
-      margin-bottom: 20px;
-    }
-
-    .filter-label {
-      font-size: 12px;
-      font-weight: 600;
-      text-transform: uppercase;
-      color: var(--text-secondary);
-      margin-bottom: 8px;
-      display: block;
-    }
-
-    .filter-chips {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      margin-bottom: 16px;
-    }
-
+    .filters { display: flex; gap: 8px; overflow-x: auto; padding: 4px 0 4px; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+    .filters::-webkit-scrollbar { display: none; }
     .chip {
-      padding: 8px 16px;
-      background-color: var(--bg-secondary);
-      border: 1px solid var(--border-color);
-      border-radius: 20px;
-      color: var(--text-primary);
-      font-size: 13px;
-      cursor: pointer;
-      transition: background-color 0.2s, border-color 0.2s;
+      flex: none; height: 34px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--line);
+      background: var(--chip); font-size: 14px; white-space: nowrap; display: inline-flex; align-items: center; gap: 6px;
+    }
+    .chip[aria-pressed="true"] { background: var(--chip-on); color: var(--chip-on-text); border-color: var(--chip-on); }
+    select.chip { padding-right: 10px; }
+    .sep { flex: none; width: 1px; background: var(--line); margin: 4px 2px; }
+
+    /* Status */
+    .status { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 13px; color: var(--muted); padding: 8px 0 4px; min-height: 30px; align-items: center; }
+    .status .it { display: inline-flex; align-items: center; gap: 6px; }
+    .bar { width: 90px; height: 6px; border-radius: 3px; background: var(--soft); overflow: hidden; display: inline-block; }
+    .bar i { display: block; height: 100%; background: var(--deal); transition: width .4s; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex: none; }
+    .dot.l { background: var(--lief); }
+    .dot.w { background: var(--wolt); }
+    .dot.u { background: var(--uber); }
+    .linkish { border: 0; background: none; padding: 0; color: var(--text); text-decoration: underline; text-underline-offset: 2px; font-size: 13px; }
+
+    /* Loading progress pinned below the search bar, with a short note on the limits */
+    .progress { margin-top: 8px; padding: 8px 12px; border-radius: 12px; background: var(--card); border: 1px solid var(--line); display: grid; gap: 6px; font-size: 13px; }
+    #pg-rows { display: grid; gap: 6px; }
+    .pg { display: grid; grid-template-columns: auto auto 1fr auto; align-items: center; gap: 4px 8px; }
+    .pg .pl { font-weight: 600; white-space: nowrap; }
+    .pg .bar { width: 100%; min-width: 60px; }
+    .pg .pc { color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .pg .pn { grid-column: 2 / -1; color: var(--muted); font-size: 12px; margin-top: -3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .pg.warn .pn { color: var(--deal); }
+    .bar.indet i { width: 35% !important; animation: indet 1.2s ease-in-out infinite; }
+    @keyframes indet { 0% { transform: translateX(-100%); } 100% { transform: translateX(290%); } }
+    .pg-foot { display: flex; justify-content: flex-end; }
+    .limits { margin-top: 8px; padding: 12px 14px; border-radius: 12px; background: var(--card); border: 1px solid var(--line); font-size: 13px; max-height: 50vh; overflow: auto; }
+    .limits ul { margin: 6px 0 8px; padding-left: 0; list-style: none; display: grid; gap: 6px; }
+    .limits li { display: grid; grid-template-columns: 14px 1fr; gap: 6px; align-items: baseline; }
+    .toast {
+      position: fixed; z-index: 45; left: 50%; top: 12px; transform: translateX(-50%); max-width: calc(100% - 32px);
+      background: var(--chip-on); color: var(--chip-on-text); padding: 10px 16px; border-radius: 999px; font-size: 14px; font-weight: 600;
+      box-shadow: 0 6px 20px rgba(0, 0, 0, .25);
+    }
+    .spin { width: 12px; height: 12px; border: 2px solid var(--line); border-top-color: var(--deal); border-radius: 50%; display: inline-block; animation: spin .8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .summary { display: flex; justify-content: space-between; align-items: baseline; gap: 4px 12px; margin: 10px 0 12px; flex-wrap: wrap; }
+    .summary h2 { font-size: 20px; margin: 0; letter-spacing: -.01em; }
+    .note { font-size: 13px; color: var(--muted); }
+
+    /* Grids and cards */
+    .grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); padding-bottom: 24px; }
+    .grid.dishes { grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); }
+    /* Long single-line texts (restaurant names) must not widen the column beyond the screen */
+    .grid > * { min-width: 0; }
+    .card { background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; border: 1px solid var(--line); text-align: left; padding: 0; width: 100%; display: block; transition: transform .15s; }
+    .card:active { transform: scale(.985); }
+    /* Cards outside the screen are not laid out or painted: keeps long lists smooth */
+    .rcard { content-visibility: auto; contain-intrinsic-size: auto 290px; }
+    .dcard { content-visibility: auto; contain-intrinsic-size: auto 150px; }
+    @media (hover: hover) {
+      .card:hover { transform: translateY(-2px); }
+      .cz:hover .ic { transform: translateY(-2px); }
     }
 
-    .chip.active {
-      background-color: var(--accent-primary);
-      color: white;
-      border-color: var(--accent-primary);
+    .rcard .media { position: relative; height: 140px; background: linear-gradient(135deg, var(--soft), var(--bg)); display: grid; place-items: center; overflow: hidden; }
+    .rcard .media img.cover { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+    .rcard .media img.logo-big { width: 92px; height: 92px; object-fit: contain; border-radius: 16px; background: #fff; padding: 6px; box-shadow: var(--shadow); }
+    .rcard .media .initial { font-size: 44px; font-weight: 800; color: var(--muted); }
+    .rcard.closed .media::after { content: ""; position: absolute; inset: 0; background: rgba(0, 0, 0, .45); }
+    .closed-label { position: absolute; z-index: 2; left: 50%; top: 50%; transform: translate(-50%, -50%); color: #fff; font-weight: 700; text-align: center; font-size: 14px; }
+    .src { position: absolute; z-index: 3; top: 10px; right: 10px; font-size: 11px; font-weight: 700; color: #fff; padding: 3px 8px; border-radius: 999px; }
+    .src.lieferando { background: var(--lief); }
+    .src.wolt { background: var(--wolt); }
+    .src.uber { background: var(--uber); }
+    .ribbon { position: absolute; z-index: 3; top: 10px; left: 10px; background: var(--deal); color: #fff; font-weight: 800; font-size: 12px; padding: 4px 10px; border-radius: 999px; }
+    .rcard .body { padding: 12px 14px 14px; }
+    .rcard .title { display: flex; align-items: center; gap: 8px; }
+    .rcard .title img { width: 28px; height: 28px; border-radius: 8px; object-fit: contain; background: #fff; flex: none; }
+    .rcard h3 { font-size: 16px; margin: 0; line-height: 1.25; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .meta { font-size: 13px; color: var(--muted); margin-top: 4px; display: flex; flex-wrap: wrap; gap: 2px 10px; }
+    .meta .star { color: var(--text); font-weight: 600; }
+    .meta .star::before { content: "★ "; color: var(--star); }
+    .tags { font-size: 13px; color: var(--muted); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .badges { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+    .badges:empty { display: none; }
+    .b { font-size: 12px; font-weight: 600; padding: 3px 8px; border-radius: 6px; line-height: 1.3; }
+    .b.deal { background: var(--deal-soft); color: var(--deal); }
+    .b.deal.hot { background: var(--deal); color: #fff; }
+    .b.veg { background: var(--veg-soft); color: var(--veg); }
+    .b.vegan { background: var(--vegan-soft); color: var(--vegan); }
+    .b.guess { background: none; border: 1px dashed currentColor; color: var(--veg); }
+    .b.soft { background: var(--soft); color: var(--muted); }
+
+    .dcard { display: flex; gap: 12px; padding: 14px; min-height: 140px; }
+    .dcard .txt { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+    .dcard h3 { font-size: 15px; margin: 0; line-height: 1.3; }
+    .dcard .desc { font-size: 13px; color: var(--muted); margin: 4px 0 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .price { margin-top: 6px; font-weight: 700; }
+    .price s { color: var(--muted); font-weight: 400; margin-left: 6px; font-size: 13px; }
+    .price .from { font-weight: 400; color: var(--muted); font-size: 13px; }
+    .dcard .pic { position: relative; flex: none; width: 112px; height: 112px; border-radius: 12px; overflow: hidden; background: var(--soft); }
+    .dcard .pic img { width: 100%; height: 100%; object-fit: cover; }
+    .dcard .pic .b { position: absolute; left: 6px; top: 6px; }
+    .rest-line { margin-top: auto; padding-top: 10px; font-size: 12.5px; color: var(--muted); display: flex; align-items: center; gap: 6px; min-width: 0; }
+    .rest-line img { width: 18px; height: 18px; border-radius: 5px; object-fit: contain; background: #fff; flex: none; }
+    .rest-line > * { flex: none; white-space: nowrap; }
+    .rest-line .rn { flex: 0 1 auto; min-width: 0; color: var(--text); font-weight: 600; overflow: hidden; text-overflow: ellipsis; }
+    .more-in { font-size: 12.5px; color: var(--deal); font-weight: 600; margin-top: 4px; }
+
+    .more { display: block; margin: 8px auto 40px; }
+    .empty { text-align: center; padding: 48px 16px; color: var(--muted); }
+    .empty b { display: block; color: var(--text); font-size: 17px; margin-bottom: 6px; }
+
+    .sk { background: linear-gradient(90deg, var(--soft) 25%, var(--line) 50%, var(--soft) 75%); background-size: 200% 100%; animation: sh 1.2s infinite; border-radius: var(--radius); height: 150px; }
+    @keyframes sh { to { background-position: -200% 0; } }
+
+    img.broken { visibility: hidden; }
+
+    /* "New results" button instead of moving the list under the finger */
+    .pill {
+      position: fixed; z-index: 35; left: 50%; bottom: calc(20px + var(--nav-h) + var(--safe-b)); transform: translateX(-50%);
+      border: 0; border-radius: 999px; padding: 10px 18px; background: var(--chip-on); color: var(--chip-on-text);
+      font-weight: 700; box-shadow: 0 6px 20px rgba(0, 0, 0, .25);
     }
 
-    .wolt-progress {
-      display: none;
-      margin-bottom: 16px;
+    /* Drawer (side panel on desktop, sheet from the bottom on phones) */
+    .backdrop { position: fixed; inset: 0; background: rgba(0, 0, 0, .4); z-index: 40; opacity: 0; pointer-events: none; transition: opacity .2s; }
+    .backdrop.open { opacity: 1; pointer-events: auto; }
+    .drawer {
+      position: fixed; z-index: 50; top: 0; right: 0; bottom: 0; width: min(620px, 100%); background: var(--bg);
+      transform: translateX(100%); transition: transform .25s ease; display: flex; flex-direction: column; box-shadow: -8px 0 30px rgba(0, 0, 0, .2);
+      will-change: transform;
     }
+    .drawer.open { transform: none; }
+    .dscroll { overflow-y: auto; flex: 1; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+    .dclose { position: absolute; z-index: 10; top: 12px; right: 12px; width: 40px; height: 40px; border-radius: 50%; border: 0; background: var(--card); box-shadow: var(--shadow); font-size: 22px; line-height: 1; }
+    .dhero { position: relative; height: 170px; background: linear-gradient(135deg, var(--soft), var(--bg)); display: grid; place-items: center; overflow: hidden; }
+    .dhero img.cover { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+    .dhero img.logo-big { width: 96px; height: 96px; object-fit: contain; border-radius: 16px; background: #fff; padding: 6px; }
+    .dhero .src { right: auto; left: 12px; top: 12px; }
+    .dinfo { padding: 14px 16px 6px; }
+    .dinfo h2 { margin: 0; font-size: 22px; letter-spacing: -.02em; }
+    .dinfo .meta { font-size: 14px; }
+    .offers { display: flex; flex-direction: column; gap: 6px; margin-top: 12px; }
+    .offer { background: var(--deal-soft); color: var(--text); border-radius: 10px; padding: 8px 12px; font-size: 14px; }
+    .offer b { color: var(--deal); }
+    .dtools { position: sticky; top: 0; z-index: 5; background: var(--bg); padding: 10px 64px 6px 16px; border-bottom: 1px solid var(--line); }
+    .dtools .row { display: flex; gap: 8px; align-items: center; }
+    #mq { flex: 1; min-width: 0; height: 40px; border-radius: 999px; border: 1px solid var(--line); background: var(--card); padding: 0 14px; font-size: 16px; }
+    .dcats { display: flex; gap: 6px; overflow-x: auto; padding: 8px 0 2px; scrollbar-width: none; }
+    .dcats::-webkit-scrollbar { display: none; }
+    .dcats .chip { height: 32px; font-size: 13px; }
+    .dnav { display: flex; gap: 2px; overflow-x: auto; padding: 6px 0 0; scrollbar-width: none; margin: 0 -4px; }
+    .dnav::-webkit-scrollbar { display: none; }
+    .dnav button { flex: none; border: 0; background: none; padding: 6px 8px; font-size: 13px; font-weight: 600; color: var(--muted); white-space: nowrap; border-bottom: 2px solid transparent; }
+    .dnav button:hover { color: var(--text); border-bottom-color: var(--text); }
+    .dmenu { padding: 4px 16px 24px; }
+    .dmenu h3 { font-size: 17px; margin: 22px 0 8px; scroll-margin-top: 120px; }
+    .mi { display: flex; gap: 12px; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px; margin-bottom: 8px; content-visibility: auto; contain-intrinsic-size: auto 110px; }
+    .mi .t { flex: 1; min-width: 0; }
+    .mi .n { font-weight: 600; }
+    .mi .d { font-size: 13px; color: var(--muted); margin-top: 2px; }
+    .mi img { width: 88px; height: 88px; border-radius: 10px; object-fit: cover; flex: none; background: var(--soft); }
+    .mi.focus { outline: 2px solid var(--deal); animation: flash 1.6s ease 1; }
+    .mi.soldout { opacity: .55; }
+    @keyframes flash { 0%, 40% { background: var(--deal-soft); } }
+    .dfoot { padding: 10px 16px calc(10px + var(--safe-b)); background: var(--card); border-top: 1px solid var(--line); }
+    .cta { display: flex; align-items: center; justify-content: center; gap: 6px; height: 46px; border-radius: 999px; color: #fff; font-weight: 700; text-decoration: none; }
+    .cta.lieferando { background: var(--lief); }
+    .cta.wolt { background: var(--wolt); }
+    .cta.uber { background: var(--uber); }
 
-    .wolt-progress.visible {
-      display: block;
-    }
+    /* Phones */
+    @media (max-width: 700px) {
+      :root { --nav-h: 62px; }
+      .top .wrap { gap: 10px; padding-top: 10px; padding-bottom: 10px; flex-wrap: nowrap; }
+      .brand { font-size: 17px; }
+      #addr-form { flex-basis: auto; }
+      body:not(.has-area) .top .wrap { flex-wrap: wrap; }
+      body:not(.has-area) #addr-form { flex-basis: 100%; }
+      body.has-area:not(.edit-addr) #addr-form { display: none; }
+      body.has-area:not(.edit-addr) .addr-chip { display: flex; }
+      body.has-area.edit-addr .top .wrap { flex-wrap: wrap; }
+      body.has-area.edit-addr #addr-form { flex-basis: 100%; }
+      #go { padding: 0 14px; }
+      .welcome { padding: 32px 0 48px; }
+      .progress { padding: 6px 10px; gap: 4px; margin-top: 6px; }
+      .pg .pn { font-size: 11.5px; white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+      .limits { max-height: 45vh; }
 
-    .progress-label {
-      font-size: 13px;
-      color: var(--text-secondary);
-      margin-bottom: 6px;
-    }
-
-    .progress-bar {
-      height: 4px;
-      background-color: var(--bg-secondary);
-      border-radius: 2px;
-      overflow: hidden;
-    }
-
-    .progress-fill {
-      height: 100%;
-      background-color: var(--accent-primary);
-      transition: width 0.2s;
-    }
-
-    .error-message {
-      padding: 12px;
-      background-color: #fff3cd;
-      border: 1px solid #ffc107;
-      border-radius: 6px;
-      color: #856404;
-      font-size: 13px;
-      margin-bottom: 16px;
-    }
-
-    @media (prefers-color-scheme: dark) {
-      .error-message {
-        background-color: #332701;
-        border-color: #996600;
-        color: #ffb84d;
+      /* App-like bottom navigation instead of the tab switch */
+      .tabs {
+        position: fixed; z-index: 30; left: 0; right: 0; bottom: 0; border-radius: 0; padding: 6px 12px calc(6px + var(--safe-b));
+        background: var(--card); border-top: 1px solid var(--line); display: flex; gap: 8px;
       }
+      .tabs button { flex: 1; flex-direction: column; gap: 0; padding: 4px 0; font-size: 12px; border-radius: 12px; }
+      .tabs button .ti { display: block; font-size: 20px; line-height: 1.2; }
+      .tabs button[aria-selected="true"] { box-shadow: none; background: var(--soft); }
+      .toolbar { padding: 8px 0 6px; }
+
+      .cz { width: 70px; }
+      .cz .ic { width: 46px; height: 46px; font-size: 22px; }
+      .cz .lb { font-size: 11px; }
+      .chip { height: 36px; }
+      .status { padding-top: 4px; gap: 4px 14px; }
+      .status .minor { display: none; }
+      .summary h2 { font-size: 17px; }
+      .grid { gap: 12px; grid-template-columns: minmax(0, 1fr); }
+      .grid.dishes { grid-template-columns: minmax(0, 1fr); }
+      .dcard { padding: 12px; min-height: 124px; }
+      .dcard .pic { width: 96px; height: 96px; }
+      /* Restaurants as compact rows: picture left, details right */
+      .rcard { display: flex; contain-intrinsic-size: auto 132px; }
+      .rcard .media { flex: none; width: 108px; height: auto; min-height: 124px; }
+      .rcard .media img.logo-big { width: 68px; height: 68px; border-radius: 12px; padding: 4px; }
+      .rcard .src { top: 6px; right: auto; left: 6px; font-size: 10px; padding: 2px 6px; }
+      .rcard .ribbon { top: auto; bottom: 6px; left: 6px; font-size: 11px; padding: 3px 8px; }
+      .rcard .closed-label { font-size: 12px; width: 92px; }
+      .rcard .body { flex: 1; min-width: 0; padding: 10px 12px; }
+      .rcard h3 { font-size: 15px; }
+      .rcard .badges { margin-top: 6px; }
+      .dcard { contain-intrinsic-size: auto 130px; }
+
+      .drawer { width: 100%; transform: translateY(100%); box-shadow: none; }
+      .drawer.open { transform: none; }
+      .dhero { height: 140px; }
+      .mi img { width: 76px; height: 76px; }
     }
-
-    .result-count {
-      font-size: 14px;
-      font-weight: 600;
-      color: var(--text-secondary);
-      margin-bottom: 16px;
-    }
-
-    .spinner {
-      display: inline-block;
-      width: 16px;
-      height: 16px;
-      border: 2px solid var(--bg-secondary);
-      border-top-color: var(--spinner-color);
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-      margin-right: 8px;
-    }
-
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
-
-    .loading-text {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 14px;
-      color: var(--text-secondary);
-    }
-
-    .empty-state {
-      text-align: center;
-      padding: 48px 24px;
-      color: var(--text-secondary);
-    }
-
-    .empty-state p {
-      font-size: 14px;
-      line-height: 1.6;
-    }
-
-    .restaurant-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-      gap: 16px;
-      margin-bottom: 32px;
-    }
-
-    .restaurant-card {
-      background-color: var(--bg-secondary);
-      border: 1px solid var(--border-color);
-      border-radius: 8px;
-      padding: 16px;
-      transition: box-shadow 0.2s;
-    }
-
-    .restaurant-card:hover {
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-    }
-
-    @media (prefers-color-scheme: dark) {
-      .restaurant-card:hover {
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
-      }
-    }
-
-    .restaurant-header {
-      margin-bottom: 12px;
-    }
-
-    .restaurant-name {
-      font-size: 16px;
-      font-weight: 600;
-      word-break: break-word;
-    }
-
-    .restaurant-name a {
-      color: var(--accent-primary);
-      text-decoration: none;
-    }
-
-    .restaurant-name a:hover {
-      text-decoration: underline;
-    }
-
-    .restaurant-meta {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      margin-top: 8px;
-      font-size: 13px;
-      color: var(--text-secondary);
-      flex-wrap: wrap;
-    }
-
-    .rating {
-      display: flex;
-      align-items: center;
-      gap: 4px;
-    }
-
-    .badge {
-      display: inline-block;
-      padding: 4px 8px;
-      border-radius: 4px;
-      font-size: 11px;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-    }
-
-    .badge-lieferando {
-      background-color: var(--badge-lieferando);
-      color: white;
-    }
-
-    .badge-wolt {
-      background-color: var(--badge-wolt);
-      color: white;
-    }
-
-    .restaurant-details {
-      font-size: 13px;
-      color: var(--text-secondary);
-      margin-bottom: 12px;
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-    }
-
-    .restaurant-deals {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-    }
-
-    .deal-badge {
-      display: inline-block;
-      padding: 6px 10px;
-      border-radius: 4px;
-      font-size: 12px;
-      font-weight: 600;
-      background-color: var(--bg-primary);
-      color: var(--text-primary);
-      border: 1px solid var(--border-color);
-    }
-
-    .deal-badge.bogof {
-      background-color: var(--badge-bogof);
-      color: #1a1a1a;
-      border-color: var(--badge-bogof);
-      font-weight: 700;
-    }
-
-    .deal-items-btn {
-      width: 100%;
-      margin-top: 12px;
-      padding: 8px 12px;
-      background-color: var(--bg-primary);
-      border: 1px solid var(--border-color);
-      color: var(--text-primary);
-      font-size: 13px;
-      cursor: pointer;
-      border-radius: 4px;
-      transition: background-color 0.2s, border-color 0.2s;
-    }
-
-    .deal-items-btn:hover:not(:disabled) {
-      background-color: var(--bg-secondary);
-    }
-
-    .deal-items-btn:disabled {
-      opacity: 0.6;
-      cursor: not-allowed;
-    }
-
-    .deal-items-container {
-      margin-top: 12px;
-      padding-top: 12px;
-      border-top: 1px solid var(--border-color);
-      display: none;
-    }
-
-    .deal-items-container.open {
-      display: block;
-    }
-
-    .deal-offer {
-      margin-bottom: 12px;
-    }
-
-    .deal-offer:last-child {
-      margin-bottom: 0;
-    }
-
-    .offer-header {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin-bottom: 6px;
-      font-size: 12px;
-    }
-
-    .offer-text {
-      font-size: 12px;
-      color: var(--text-secondary);
-      margin-bottom: 6px;
-      line-height: 1.4;
-    }
-
-    .deal-item {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      font-size: 12px;
-      padding: 4px 0;
-      color: var(--text-secondary);
-    }
-
-    .deal-item-name {
-      flex: 1;
-      word-break: break-word;
-      padding-right: 8px;
-    }
-
-    .deal-item-price {
-      font-weight: 600;
-      white-space: nowrap;
-    }
-
-    .deal-item-discount {
-      display: inline-block;
-      margin-left: 8px;
-      padding: 2px 6px;
-      background-color: var(--badge-bogof);
-      color: #1a1a1a;
-      border-radius: 3px;
-      font-weight: 600;
-      font-size: 11px;
-      white-space: nowrap;
-    }
-
-    .deal-items-error {
-      padding: 8px;
-      background-color: #ffebee;
-      border: 1px solid #ef5350;
-      border-radius: 4px;
-      color: #c62828;
-      font-size: 12px;
-    }
-
-    @media (prefers-color-scheme: dark) {
-      .deal-items-error {
-        background-color: #3d1a1a;
-        border-color: #a52a2a;
-        color: #ff6b6b;
-      }
-    }
-
-    .offer-no-items {
-      font-size: 12px;
-      color: var(--text-secondary);
-      font-style: italic;
-      padding: 4px 0;
-    }
-
-    @media (max-width: 768px) {
-      body {
-        padding: 12px;
-      }
-
-      h1 {
-        font-size: 24px;
-        margin-bottom: 16px;
-      }
-
-      .search-row {
-        flex-direction: column;
-      }
-
-      input[type="text"],
-      button {
-        width: 100%;
-      }
-
-      .restaurant-grid {
-        grid-template-columns: 1fr;
-      }
-
-      .toggle-group {
-        flex-direction: column;
-        align-items: stretch;
-      }
-
-      .toggle-btn {
-        width: 100%;
-        text-align: center;
-      }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation: none !important; transition: none !important; }
     }
   </style>
 </head>
 <body>
-  <header>
-    <h1>Deal-Radar 🍔</h1>
-    <div class="search-section">
-      <div class="search-row">
-        <input type="text" id="addressInput" placeholder="Adresse (z.B. Torstraße 1, 10119 Berlin)" />
-        <button id="searchBtn">Suchen</button>
+<header class="top">
+  <div class="wrap">
+    <div class="brand">Deal<span>-</span>Radar</div>
+    <button type="button" class="addr-chip" id="addr-chip" aria-label="Lieferadresse ändern">📍 <span id="addr-label"></span><b>ändern</b></button>
+    <form id="addr-form" autocomplete="off">
+      <div class="addr-field">
+        <input id="addr" type="text" maxlength="200" placeholder="Lieferadresse, z. B. Torstraße 1, 10119 Berlin" aria-label="Lieferadresse" enterkeyhint="search">
       </div>
+      <button type="button" class="btn ghost" id="locate" title="Aktuellen Standort verwenden" aria-label="Aktuellen Standort verwenden">⌖</button>
+      <button type="submit" class="btn" id="go">Suchen</button>
+    </form>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="welcome" id="welcome">
+    <h1>Worauf hast du Hunger?</h1>
+    <p>Gerichte und Restaurants von Lieferando und Wolt in einer Suche – mit Filtern für vegetarisch, vegan, Küche, Preis und Angebote.</p>
+    <p>Gib oben deine Lieferadresse ein. Bestellt wird danach wie gewohnt beim Anbieter.</p>
+    <div class="hints">
+      <span class="hint">🍕 „Margherita“ unter 10 €</span>
+      <span class="hint">🌱 Vegane Bowls</span>
+      <span class="hint">🔥 Alle 2-für-1-Deals</span>
+      <span class="hint">🍛 Indisch, vegetarisch</span>
     </div>
+    <div id="welcome-msg"></div>
+  </section>
 
-    <div class="filter-section">
-      <span class="filter-label">Filter nach Deal-Typ</span>
-      <div class="filter-chips">
-        <button class="chip active" data-type="bogof">2 für 1</button>
-        <button class="chip" data-type="item_discount">% auf Gerichte</button>
-        <button class="chip" data-type="basket_discount">Warenkorb-Rabatt</button>
-        <button class="chip" data-type="free_delivery">Gratis-Lieferung</button>
-        <button class="chip" data-type="free_item">Gratis-Artikel</button>
-      </div>
-    </div>
-
-    <div class="filter-section">
-      <span class="filter-label">Weitere Filter</span>
-      <div class="toggle-group">
-        <button class="toggle-btn active" id="openOnlyToggle">Nur geöffnete (an)</button>
-      </div>
-    </div>
-
-    <div class="wolt-progress" id="woltProgress">
-      <div class="progress-label" id="progressLabel">Wolt: 0/150 gescannt</div>
-      <div class="progress-bar">
-        <div class="progress-fill" id="progressFill" style="width: 0%"></div>
-      </div>
-    </div>
-
-    <div id="errorContainer"></div>
-  </header>
-
-  <main>
-    <div id="resultCount" class="result-count"></div>
-    <div id="restaurantContainer" class="restaurant-grid"></div>
-    <div id="emptyState" class="empty-state" style="display: none;">
-      <p>Geben Sie eine Adresse ein, um Restaurants mit Deals zu suchen.</p>
-    </div>
-  </main>
-
-  <script>
-    const API_BASE = '';
-    const POLL_INTERVAL = 1500;
-    const WOLT_LIMIT = 150;
-
-    // State
-    let allRestaurants = [];
-    let lieferandoLoading = false;
-    let woltScanId = null;
-    let woltPollingActive = false;
-    let activeFilters = new Set(['bogof']);
-    let openOnlyFilter = true;
-    let dealItemsCache = {}; // {source|slug: {ok, offers, error}}
-    let expandedCards = new Set(); // source|slug keys whose deal items are expanded
-
-    // DOM Elements
-    const addressInput = document.getElementById('addressInput');
-    const searchBtn = document.getElementById('searchBtn');
-    const filterChips = document.querySelectorAll('.chip');
-    const openOnlyToggle = document.getElementById('openOnlyToggle');
-    const restaurantContainer = document.getElementById('restaurantContainer');
-    const emptyState = document.getElementById('emptyState');
-    const resultCount = document.getElementById('resultCount');
-    const errorContainer = document.getElementById('errorContainer');
-    const woltProgress = document.getElementById('woltProgress');
-    const progressLabel = document.getElementById('progressLabel');
-    const progressFill = document.getElementById('progressFill');
-
-    // Initialize
-    function init() {
-      loadFromLocalStorage();
-
-      searchBtn.addEventListener('click', handleSearch);
-      addressInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') handleSearch();
-      });
-
-      filterChips.forEach(chip => {
-        chip.addEventListener('click', () => {
-          const type = chip.dataset.type;
-          if (activeFilters.has(type)) {
-            activeFilters.delete(type);
-          } else {
-            activeFilters.add(type);
-          }
-          chip.classList.toggle('active');
-          render();
-        });
-      });
-
-      openOnlyToggle.addEventListener('click', () => {
-        openOnlyFilter = !openOnlyFilter;
-        openOnlyToggle.textContent = openOnlyFilter ? 'Nur geöffnete (an)' : 'Nur geöffnete (aus)';
-        openOnlyToggle.classList.toggle('active');
-        render();
-      });
-
-      showEmptyState();
-    }
-
-    function loadFromLocalStorage() {
-      const savedAddress = localStorage.getItem('dealRadarAddress');
-      if (savedAddress) addressInput.value = savedAddress;
-    }
-
-    function saveToLocalStorage() {
-      localStorage.setItem('dealRadarAddress', addressInput.value);
-    }
-
-    async function handleSearch() {
-      const address = addressInput.value.trim();
-
-      if (!address) {
-        showError('Bitte Adresse eingeben.');
-        return;
-      }
-
-      saveToLocalStorage();
-      allRestaurants = [];
-      errorContainer.innerHTML = '';
-      woltScanId = null;
-      woltPollingActive = false;
-      woltProgress.classList.remove('visible');
-      progressFill.style.width = '0%';
-
-      lieferandoLoading = true;
-      render();
-
-      // First geocode
-      try {
-        const geocodeResponse = await fetch(`${API_BASE}/api/geocode?q=${encodeURIComponent(address)}`);
-        const geocodeData = await geocodeResponse.json();
-
-        if (!geocodeData.ok || !geocodeData.city || !geocodeData.plz) {
-          showError('Adresse nicht gefunden — bitte mit PLZ und Ort eingeben');
-          lieferandoLoading = false;
-          render();
-          return;
-        }
-
-        const { lat, lon, city, plz } = geocodeData;
-
-        // Parallel: Lieferando + Wolt
-        Promise.all([
-          fetchLieferando(city, plz),
-          startWoltScan(lat, lon)
-        ]).catch(err => {
-          console.error('Search error:', err);
-        }).finally(() => {
-          lieferandoLoading = false;
-          render();
-        });
-      } catch (err) {
-        console.error('Geocode error:', err);
-        showError('Geocoding: Netzwerkfehler');
-        lieferandoLoading = false;
-        render();
-      }
-    }
-
-    async function fetchLieferando(city, plz) {
-      try {
-        const response = await fetch(`${API_BASE}/api/lieferando?city=${encodeURIComponent(city)}&plz=${encodeURIComponent(plz)}`);
-        const data = await response.json();
-        if (data.ok && data.restaurants) {
-          allRestaurants = allRestaurants.concat(data.restaurants);
-          render();
-        } else if (!data.ok) {
-          showError(`Lieferando: ${data.error || 'Fehler'}`);
-        }
-      } catch (err) {
-        console.error('Lieferando fetch error:', err);
-        showError('Lieferando: Netzwerkfehler');
-      }
-    }
-
-    async function startWoltScan(lat, lon) {
-      try {
-        const response = await fetch(`${API_BASE}/api/wolt/scan`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ lat, lon, limit: WOLT_LIMIT })
-        });
-        const data = await response.json();
-        if (data.ok) {
-          woltScanId = data.scan_id;
-          woltPollingActive = true;
-          woltProgress.classList.add('visible');
-          pollWoltScan();
-        } else {
-          showError(`Wolt-Scan: ${data.error || 'Fehler'}`);
-        }
-      } catch (err) {
-        console.error('Wolt scan start error:', err);
-        showError('Wolt-Scan: Netzwerkfehler');
-      }
-    }
-
-    function pollWoltScan() {
-      if (!woltScanId || !woltPollingActive) return;
-
-      fetch(`${API_BASE}/api/wolt/scan/${woltScanId}`)
-        .then(response => response.json())
-        .then(data => {
-          if (!data.ok) {
-            console.error('Poll error:', data.error);
-            return;
-          }
-
-          // Merge Wolt restaurants (dedupe by source+link)
-          if (data.restaurants && data.restaurants.length > 0) {
-            const existingLinks = new Set(allRestaurants
-              .filter(r => r.source === 'wolt')
-              .map(r => r.link));
-
-            data.restaurants.forEach(woltRes => {
-              const idx = allRestaurants.findIndex(r => r.source === 'wolt' && r.link === woltRes.link);
-              if (idx >= 0) {
-                allRestaurants[idx] = woltRes;
-              } else if (!existingLinks.has(woltRes.link)) {
-                allRestaurants.push(woltRes);
-              }
-            });
-          }
-
-          progressLabel.textContent = `Wolt: ${data.scanned || 0}/${data.total || WOLT_LIMIT} gescannt`;
-          progressFill.style.width = ((data.scanned || 0) / (data.total || WOLT_LIMIT)) * 100 + '%';
-
-          if (data.done) {
-            woltPollingActive = false;
-            woltProgress.classList.remove('visible');
-          } else if (woltPollingActive) {
-            setTimeout(pollWoltScan, POLL_INTERVAL);
-          }
-
-          render();
-        })
-        .catch(err => {
-          console.error('Wolt poll error:', err);
-          woltPollingActive = false;
-          woltProgress.classList.remove('visible');
-        });
-    }
-
-    function getVisibleRestaurants() {
-      if (allRestaurants.length === 0) return [];
-
-      return allRestaurants.filter(rest => {
-        // Filter by open status
-        if (openOnlyFilter && !rest.open_now) return false;
-
-        // Filter by deals
-        if (activeFilters.size === 0) {
-          // No active filters: show if ≥1 visible deal (not stampcard/other)
-          const visibleDeals = (rest.deals || []).filter(d =>
-            d.type !== 'stampcard' && d.type !== 'other'
-          );
-          return visibleDeals.length > 0;
-        } else {
-          // Active filters: show if ≥1 deal matches
-          return (rest.deals || []).some(d => activeFilters.has(d.type));
-        }
-      });
-    }
-
-    function sortRestaurants(restaurants) {
-      return restaurants.sort((a, b) => {
-        // Sort by bogof first
-        const aHasBogof = (a.deals || []).some(d => d.type === 'bogof');
-        const bHasBogof = (b.deals || []).some(d => d.type === 'bogof');
-
-        if (aHasBogof && !bHasBogof) return -1;
-        if (!aHasBogof && bHasBogof) return 1;
-
-        // Then by rating descending (nulls last)
-        const aRating = a.rating !== null && a.rating !== undefined ? a.rating : -1;
-        const bRating = b.rating !== null && b.rating !== undefined ? b.rating : -1;
-
-        if (aRating === -1 && bRating === -1) return 0;
-        if (aRating === -1) return 1;
-        if (bRating === -1) return -1;
-        return bRating - aRating;
-      });
-    }
-
-    function formatNumber(num) {
-      if (num === null || num === undefined) return '';
-      return new Intl.NumberFormat('de-DE', {
-        minimumFractionDigits: num % 1 === 0 ? 0 : 1,
-        maximumFractionDigits: 2
-      }).format(num);
-    }
-
-    function formatCurrency(cents) {
-      return (cents / 100).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    }
-
-    function render() {
-      const visible = getVisibleRestaurants();
-      const sorted = sortRestaurants(visible);
-
-      if (allRestaurants.length === 0 && lieferandoLoading) {
-        restaurantContainer.innerHTML = `
-          <div class="loading-text">
-            <span class="spinner"></span>
-            Suche läuft...
-          </div>
-        `;
-        emptyState.style.display = 'none';
-        resultCount.textContent = '';
-        return;
-      }
-
-      if (sorted.length === 0) {
-        restaurantContainer.innerHTML = '';
-        emptyState.style.display = 'block';
-        resultCount.textContent = '';
-        return;
-      }
-
-      emptyState.style.display = 'none';
-      restaurantContainer.innerHTML = sorted.map(rest => createRestaurantCard(rest)).join('');
-      resultCount.textContent = `${sorted.length} Restaurant${sorted.length === 1 ? '' : 's'} mit Deals`;
-
-      // Attach event listeners to deal items buttons
-      const dealItemsBtns = restaurantContainer.querySelectorAll('.deal-items-btn');
-      dealItemsBtns.forEach(btn => {
-        btn.addEventListener('click', handleDealItemsClick);
-        // Restore expansion state lost by the innerHTML rebuild
-        const key = `${btn.dataset.source}|${btn.dataset.slug}`;
-        if (expandedCards.has(key) && dealItemsCache[key] !== undefined) {
-          const container = document.getElementById(`${btn.dataset.cardId}-items`);
-          if (container) {
-            const cached = dealItemsCache[key];
-            container.innerHTML = cached.ok
-              ? renderDealItems(cached.offers)
-              : `<div class="deal-items-error">Fehler beim Laden der Gerichte: ${cached.error || 'Unbekannter Fehler'}</div>`;
-            container.classList.add('open');
-            btn.textContent = 'Gerichte ausblenden ▴';
-          }
-        }
-      });
-    }
-
-    function createRestaurantCard(rest) {
-      const name = rest.name || 'Restaurant';
-      const link = rest.link || '#';
-      const sourceLabel = rest.source === 'lieferando' ? 'Lieferando' : 'Wolt';
-      const sourceClass = rest.source === 'lieferando' ? 'badge-lieferando' : 'badge-wolt';
-      const cardId = `card-${rest.source}-${rest.slug || rest.link.replace(/[^a-z0-9]/gi, '')}`;
-
-      let ratingHtml = '';
-      if (rest.rating !== null && rest.rating !== undefined) {
-        const ratingCount = rest.rating_count || 0;
-        const countStr = formatNumber(ratingCount);
-        ratingHtml = `<div class="rating">★ ${formatNumber(rest.rating)} (${countStr})</div>`;
-      }
-
-      const eta = rest.eta || '';
-      let deliveryHtml = '';
-      if (rest.delivery_fee_cents === 0 || rest.delivery_fee_cents === '0') {
-        deliveryHtml = '<div>Gratis Lieferung</div>';
-      } else if (rest.delivery_fee_cents > 0) {
-        const fee = formatCurrency(rest.delivery_fee_cents);
-        deliveryHtml = `<div>${fee} € Lieferung</div>`;
-      }
-
-      let minOrderHtml = '';
-      if (rest.min_order_cents === 0 || rest.min_order_cents === '0') {
-        minOrderHtml = '<div>Kein Minimum</div>';
-      } else if (rest.min_order_cents > 0) {
-        const minOrder = formatCurrency(rest.min_order_cents);
-        minOrderHtml = `<div>Min. ${minOrder} €</div>`;
-      }
-
-      const dealsHtml = (rest.deals || [])
-        .filter(d => d.type !== 'stampcard' && d.type !== 'other')
-        .map(d => {
-          const isBogof = d.type === 'bogof';
-          const text = d.text || (d.type === 'bogof' ? '2 für 1' : d.type);
-          return `<span class="deal-badge ${isBogof ? 'bogof' : ''}">${text}</span>`;
-        })
-        .join('');
-
-      // Deal Items Button (only if slug exists)
-      const dealItemsBtn = rest.slug ? `<button class="deal-items-btn" data-source="${rest.source}" data-slug="${rest.slug}" data-card-id="${cardId}">Gerichte anzeigen ▾</button>` : '';
-      const dealItemsContainer = rest.slug ? `<div class="deal-items-container" id="${cardId}-items"></div>` : '';
-
-      return `
-        <div class="restaurant-card" id="${cardId}">
-          <div class="restaurant-header">
-            <div class="restaurant-name">
-              <a href="${link}" target="_blank" rel="noopener">${name}</a>
-              <span class="badge ${sourceClass}" style="margin-left: 8px;">${sourceLabel}</span>
-            </div>
-            <div class="restaurant-meta">
-              ${ratingHtml}
-              ${eta ? `<div>${eta} min</div>` : ''}
-            </div>
-          </div>
-          <div class="restaurant-details">
-            ${deliveryHtml}
-            ${minOrderHtml}
-          </div>
-          <div class="restaurant-deals">
-            ${dealsHtml}
-          </div>
-          ${dealItemsBtn}
-          ${dealItemsContainer}
+  <section id="app" hidden>
+    <div class="toolbar">
+      <div class="row">
+        <div class="tabs" role="tablist" aria-label="Ansicht">
+          <button role="tab" id="tab-dishes" data-tab="dishes" aria-selected="true"><span class="ti" aria-hidden="true">🍽️</span>Gerichte</button>
+          <button role="tab" id="tab-restaurants" data-tab="restaurants" aria-selected="false"><span class="ti" aria-hidden="true">🏪</span>Restaurants</button>
         </div>
-      `;
+        <div class="search">
+          <input id="q" type="search" maxlength="100" placeholder="Gericht suchen, z. B. Pad Thai, Falafel" aria-label="Suche" enterkeyhint="search">
+        </div>
+      </div>
+      <div class="progress" id="progress" hidden>
+        <div id="pg-rows" aria-live="polite"></div>
+        <div class="pg-foot"><button class="linkish" data-limits>ⓘ Einschränkungen</button></div>
+      </div>
+      <div class="limits" id="limits" hidden>
+        <b>Was die Suche kann – und was nicht</b>
+        <ul>
+          <li><span class="dot w"></span><span><b>Wolt</b> erlaubt nur etwa 15–20 Abfragen pro Minute. Die Angebote werden deshalb nach und nach geprüft, die Restaurants auf deinem Bildschirm zuerst. Wolt-Gerichte kommen über Wolts eigene Suche – dafür ein Suchwort eingeben oder eine Küche wählen.</span></li>
+          <li><span class="dot u"></span><span><b>Uber Eats</b>: Restaurants und Angebote kommen direkt mit der Liste. Gerichte sind erst durchsuchbar, wenn du ein Restaurant öffnest; die Küche wird bis dahin am Namen erkannt. Lässt Uber keine Abrufe zu, pausiert die App 15 Minuten.</span></li>
+          <li><span class="dot l"></span><span><b>Lieferando</b>: Die Gerichtesuche umfasst die Speisekarten der 300 nächstgelegenen geöffneten Restaurants.</span></li>
+          <li><span>🌱</span><span><b>Vegetarisch/vegan</b> ist ein Hinweis aus Kennzeichnung, Beschreibung oder Zutaten – im Zweifel beim Anbieter prüfen.</span></li>
+        </ul>
+        <button class="btn ghost" data-limits-close>Schließen</button>
+      </div>
+    </div>
+    <div class="cuisines" id="cuisines" aria-label="Küchen"></div>
+    <div class="filters" id="filters" aria-label="Filter"></div>
+    <div class="status" id="status" aria-live="polite"></div>
+    <div id="msg"></div>
+    <div class="summary" id="summary"></div>
+    <div id="results"></div>
+    <button class="btn ghost more" id="more" hidden>Mehr anzeigen</button>
+  </section>
+</main>
+
+<button class="pill" id="pill" hidden>↻ Neue Treffer anzeigen</button>
+<div class="toast" id="toast" role="status" hidden></div>
+<div class="backdrop" id="backdrop"></div>
+<aside class="drawer" id="drawer" role="dialog" aria-modal="true" aria-labelledby="d-name" hidden>
+  <button class="dclose" id="dclose" aria-label="Schließen">×</button>
+  <div class="dscroll" id="dscroll"></div>
+  <div class="dfoot" id="dfoot" hidden></div>
+</aside>
+
+<script>
+"use strict";
+
+// ---------- Helpers ----------
+const $ = (s, el = document) => el.querySelector(s);
+const IMG_HOSTS = new Set(["res.cloudinary.com", "just-eat-prod-eu-res.cloudinary.com", "imageproxy.wolt.com", "wolt-menu-images-cdn.wolt.com", "tb-static.uber.com"]);
+const LINK_HOSTS = ["lieferando.de", "wolt.com", "ubereats.com"];
+const PROVIDER = { lieferando: "Lieferando", wolt: "Wolt", uber: "Uber Eats" };
+const DOT = { lieferando: "l", wolt: "w", uber: "u" };
+
+function esc(s) {
+  return String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+function imgUrl(u) {
+  try { const x = new URL(u); return x.protocol === "https:" && IMG_HOSTS.has(x.hostname) ? x.href : ""; } catch { return ""; }
+}
+function linkUrl(u) {
+  try {
+    const x = new URL(u);
+    return x.protocol === "https:" && LINK_HOSTS.some(h => x.hostname === h || x.hostname.endsWith("." + h)) ? x.href : "";
+  } catch { return ""; }
+}
+const eur = new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR" });
+const num = new Intl.NumberFormat("de-DE");
+const money = c => (c == null ? "" : eur.format(c / 100));
+const fold = s => String(s || "").toLowerCase().normalize("NFKD").replace(/[̀-ͯ]/g, "")
+  .replace(/ß/g, "ss").replace(/ae/g, "a").replace(/oe/g, "o").replace(/ue/g, "u");
+const tokensOf = s => fold(s).split(/[^a-z0-9-]+/).filter(Boolean);
+function eta(r) { return r.eta ? `${r.eta.replace("-", "–")} Min.` : ""; }
+function dist(m) { return m == null ? "" : m < 1000 ? `${Math.round(m / 10) * 10} m` : `${(m / 1000).toFixed(1).replace(".", ",")} km`; }
+function rating(r) { return r.rating ? `<span class="star">${String(r.rating.toFixed ? r.rating.toFixed(1) : r.rating).replace(".", ",")}</span>${r.rating_count ? ` (${num.format(r.rating_count)})` : ""}` : ""; }
+function opensAt(r) {
+  if (!r.opens_at) return "Geschlossen";
+  const d = new Date(r.opens_at);
+  if (isNaN(d)) return "Geschlossen";
+  const t = d.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
+  return d.toDateString() === new Date().toDateString() ? `Öffnet um ${t}` : `Öffnet ${d.toLocaleDateString("de-DE", { weekday: "short" })} ${t}`;
+}
+const store = {
+  get(k) { try { return localStorage.getItem(k); } catch { return null; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch { /* private mode */ } },
+};
+async function api(path, opts = {}) {
+  let res;
+  try {
+    res = await fetch(path, { ...opts, headers: { "Content-Type": "application/json", ...(opts.headers || {}) }, credentials: "same-origin" });
+  } catch (e) {
+    if (e.name === "AbortError") return { ok: false, aborted: true };
+    return { ok: false, error: "Netzwerkfehler – bitte Verbindung prüfen" };
+  }
+  try {
+    return await res.json();
+  } catch {
+    // Cloudflare Access answers with its login page once the session has expired
+    return { ok: false, error: "Sitzung abgelaufen – bitte die Seite neu laden", status: res.status };
+  }
+}
+const atTop = () => window.scrollY < 160;
+
+// Keyed list update: cards that stay are moved, not rebuilt (images stay loaded, nothing flickers)
+const tpl = document.createElement("template");
+function cardEl(e) {
+  tpl.innerHTML = e.html.trim();
+  const el = tpl.content.firstElementChild;
+  el.dataset.key = e.key;
+  el.dataset.sig = e.sig;
+  return el;
+}
+function patchGrid(kind, entries, { reorder = true } = {}) {
+  const box = $("#results");
+  let grid = box.firstElementChild;
+  if (!grid || grid.dataset.kind !== kind) {
+    box.innerHTML = `<div class="grid ${kind === "dishes" ? "dishes" : ""}" data-kind="${kind}"></div>`;
+    grid = box.firstElementChild;
+  }
+  const existing = new Map();
+  for (const el of grid.children) existing.set(el.dataset.key, el);
+  if (!reorder) {
+    for (const e of entries) {
+      const el = existing.get(e.key);
+      if (el && el.dataset.sig !== e.sig) el.replaceWith(cardEl(e));
     }
-
-    function showError(message) {
-      const errorDiv = document.createElement('div');
-      errorDiv.className = 'error-message';
-      errorDiv.textContent = message;
-      errorContainer.appendChild(errorDiv);
+    return;
+  }
+  let prev = null;
+  for (const e of entries) {
+    let el = existing.get(e.key);
+    if (el) {
+      existing.delete(e.key);
+      if (el.dataset.sig !== e.sig) { const fresh = cardEl(e); el.replaceWith(fresh); el = fresh; }
+    } else {
+      el = cardEl(e);
     }
+    const next = prev ? prev.nextElementSibling : grid.firstElementChild;
+    if (el !== next) grid.insertBefore(el, next);
+    prev = el;
+  }
+  for (const el of existing.values()) el.remove();
+}
+function shownKeys() {
+  const grid = $("#results").firstElementChild;
+  return grid && grid.dataset.kind ? [...grid.children].map(el => el.dataset.key).join(",") : "";
+}
 
-    function showEmptyState() {
-      restaurantContainer.innerHTML = '';
-      emptyState.style.display = 'block';
-      resultCount.textContent = '';
+// Deal and diet badges
+const DEAL_LABEL = { bogof: "2 für 1", free_item: "Gratis-Artikel", free_delivery: "Gratis Lieferung", stampcard: "Stempelkarte" };
+function dealShort(d) {
+  if (!d) return "";
+  if (d.type === "item_discount") return d.pct ? `−${d.pct} %` : "Rabatt";
+  if (d.type === "basket_discount") { const m = /(\d+\s?%|\d+\s?€)/.exec(d.text || ""); return m ? `−${m[1].replace(/\s/g, " ")}` : "Rabatt"; }
+  return DEAL_LABEL[d.type] || "Angebot";
+}
+function dealBadge(d, hot) {
+  return d ? `<span class="b deal${hot || d.type === "bogof" ? " hot" : ""}" title="${esc(d.text)}">${esc(dealShort(d))}</span>` : "";
+}
+function dietBadge(item) {
+  if (!item.diet) return "";
+  if (item.diet === "vegan") {
+    if (item.diet_src === "guess") return `<span class="b guess" title="Vermutet: Restaurant ist vegan">🌱 vermutl. vegan</span>`;
+    return `<span class="b vegan">🌱 ${item.diet_src === "option" ? "vegan möglich" : "Vegan"}</span>`;
+  }
+  if (item.diet_src === "guess") return `<span class="b guess" title="Vermutet anhand der Zutaten – bitte im Shop prüfen">🥦 vermutl. vegetarisch</span>`;
+  return `<span class="b veg">🥦 Vegetarisch</span>`;
+}
+const DEAL_ORDER = { bogof: 0, free_item: 1, item_discount: 2, basket_discount: 3, free_delivery: 4, stampcard: 6, other: 7 };
+function sortedDeals(deals) { return [...(deals || [])].sort((a, b) => (DEAL_ORDER[a.type] ?? 9) - (DEAL_ORDER[b.type] ?? 9)); }
+
+// ---------- State ----------
+const S = {
+  area: null, place: null, cuisines: [], tab: "dishes",
+  f: { q: "", cuisine: "", diet: "", deals: "", open: true, source: "", maxPrice: "", rating: false, freeDel: false, sortD: "relevance", sortR: "recommended" },
+  rest: new Map(), lists: { lieferando: null, wolt: null, uber: null }, status: null, uberPages: -1, jobs: {},
+  rLimit: 60, dLimit: 48, dish: null, dishCtrl: null,
+  pollTimer: null, polling: false, dishTimer: null, pointerDown: false, pending: null, drawer: null, pillAction: null,
+};
+let bumpTimer = null, lastBump = "";
+
+// Re-renders triggered by polling wait until no pointer is pressed, so taps never land on replaced elements
+document.addEventListener("pointerdown", () => { S.pointerDown = true; }, true);
+const release = () => setTimeout(() => {
+  S.pointerDown = false;
+  if (S.pending) { const fn = S.pending; S.pending = null; fn(); }
+}, 60);
+document.addEventListener("pointerup", release, true);
+document.addEventListener("pointercancel", release, true);
+function whenIdle(fn) { if (S.pointerDown) S.pending = fn; else fn(); }
+document.addEventListener("error", e => { if (e.target.tagName === "IMG") e.target.classList.add("broken"); }, true);
+
+function showPill(action) { S.pillAction = action; $("#pill").hidden = false; }
+function hidePill() { S.pillAction = null; $("#pill").hidden = true; }
+$("#pill").addEventListener("click", () => { const fn = S.pillAction; hidePill(); if (fn) fn(); });
+
+// ---------- Address and area ----------
+function welcomeMsg(text) { $("#welcome-msg").innerHTML = text ? `<div class="msg">${esc(text)}</div>` : ""; }
+function appMsg(text) { $("#msg").innerHTML = text ? `<div class="msg">${esc(text)}</div>` : ""; }
+
+$("#addr-form").addEventListener("submit", async e => {
+  e.preventDefault();
+  const q = $("#addr").value.trim();
+  if (!q) return;
+  setBusy(true);
+  const g = await api(`/api/geocode?q=${encodeURIComponent(q)}`);
+  setBusy(false);
+  if (!g.ok) { (S.area ? appMsg : welcomeMsg)(g.error || "Adresse nicht gefunden"); return; }
+  usePlace(g, q);
+});
+
+$("#locate").addEventListener("click", () => {
+  if (!navigator.geolocation) { welcomeMsg("Dein Browser kann den Standort nicht bestimmen."); return; }
+  setBusy(true);
+  navigator.geolocation.getCurrentPosition(async pos => {
+    const g = await api(`/api/reverse?lat=${pos.coords.latitude}&lon=${pos.coords.longitude}`);
+    setBusy(false);
+    if (!g.ok) { (S.area ? appMsg : welcomeMsg)(g.error || "Standort nicht gefunden"); return; }
+    $("#addr").value = g.label;
+    usePlace(g, g.label);
+  }, () => { setBusy(false); (S.area ? appMsg : welcomeMsg)("Standort nicht freigegeben – bitte Adresse eingeben."); }, { timeout: 10000 });
+});
+
+$("#addr-chip").addEventListener("click", () => {
+  document.body.classList.add("edit-addr");
+  const input = $("#addr");
+  input.focus();
+  input.select();
+});
+
+function setBusy(b) { $("#go").disabled = b; $("#locate").disabled = b; $("#go").textContent = b ? "Suche …" : "Suchen"; }
+
+function usePlace(g, text) {
+  if (!g.plz) { (S.area ? appMsg : welcomeMsg)("Zu dieser Adresse fehlt die Postleitzahl – bitte mit PLZ eingeben."); return; }
+  S.place = g;
+  store.set("dealradar.addr", text);
+  $("#addr-label").textContent = g.label || text;
+  document.body.classList.add("has-area");
+  document.body.classList.remove("edit-addr");
+  $("#addr").blur();
+  createArea();
+}
+
+async function createArea() {
+  const p = S.place;
+  const res = await api("/api/area", { method: "POST", body: JSON.stringify({ plz: p.plz, lat: p.lat, lon: p.lon }) });
+  if (!res.ok) { (S.area ? appMsg : welcomeMsg)(res.error || "Fehler beim Laden"); return; }
+  const fresh = res.area !== S.area;
+  S.area = res.area;
+  S.cuisines = res.cuisines;
+  if (fresh) {
+    S.rest = new Map(); S.lists = { lieferando: null, wolt: null, uber: null }; S.status = null; S.uberPages = -1; S.jobs = {};
+    S.dish = null; S.rLimit = 60; S.dLimit = 48; lastBump = "";
+    $("#results").innerHTML = "";
+    hidePill();
+  }
+  welcomeMsg(""); appMsg("");
+  $("#welcome").hidden = true;
+  $("#app").hidden = false;
+  renderCuisines(); renderFilters(); renderStatus();
+  render();
+  poll();
+}
+
+// ---------- Polling (only while something is loading) ----------
+async function poll() {
+  clearTimeout(S.pollTimer);
+  if (!S.area) return;
+  S.polling = true;
+  const area = S.area;
+  const st = await api(`/api/area/${area}/status`);
+  if (area !== S.area) return;
+  if (!st.ok) {
+    if (st.expired) { S.polling = false; createArea(); return; }
+    S.pollTimer = setTimeout(poll, 5000);
+    return;
+  }
+  S.status = st;
+  let changed = false;
+  for (const src of ["lieferando", "wolt"]) {
+    if (st[src].status === "ok" && !S.lists[src]) {
+      const r = await api(`/api/area/${area}/restaurants?source=${src}`);
+      if (area !== S.area) return;
+      if (r.ok) { addList(src, r.restaurants); changed = true; }
     }
+  }
+  // Uber Eats arrives page by page: fetch the list again whenever a page was added
+  if (st.uber.count && st.uber.pages !== S.uberPages) {
+    const r = await api(`/api/area/${area}/restaurants?source=uber`);
+    if (area !== S.area) return;
+    if (r.ok) { addList("uber", r.restaurants); S.uberPages = st.uber.pages; changed = true; }
+  }
+  announceFinishedJobs(st);
+  for (const [slug, d] of Object.entries(st.wolt_deals || {})) {
+    const r = S.rest.get(`w:${slug}`);
+    if (r && r.deals === null) { r.deals = d.deals; if (d.min_order_cents != null) r.min_order_cents = d.min_order_cents; changed = true; }
+  }
+  for (const [id, dc] of Object.entries(st.diet_counts || {})) {
+    const r = S.rest.get(id);
+    if (r && !r.dc) { r.dc = dc; changed = true; }
+  }
+  renderStatus();
+  if (changed) {
+    renderCuisines();
+    if (S.tab === "restaurants") whenIdle(() => renderRestaurants({ fromPoll: true }));
+  }
+  const loading = ["lieferando", "wolt", "uber"].some(s => st[s].status === "loading") || ["waiting", "running"].includes(st.index.status);
+  const scanning = st.scan.status === "running" || st.scan.status === "waiting";
+  if (loading || scanning) S.pollTimer = setTimeout(poll, loading ? 1500 : 4000);
+  else S.polling = false;
+}
 
-    async function handleDealItemsClick(e) {
-      const btn = e.target;
-      const source = btn.dataset.source;
-      const slug = btn.dataset.slug;
-      const cardId = btn.dataset.cardId;
-      const container = document.getElementById(`${cardId}-items`);
+// Phones pause background tabs; when the page is shown again, ask at once so paused checks go on
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible" && S.area) poll();
+});
 
-      if (!container) return;
+// A short note when a slow background job is done, so it is noticed while scrolling
+let toastTimer = null;
+function toast(text) {
+  const el = $("#toast");
+  el.textContent = text;
+  el.hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { el.hidden = true; }, 4000);
+}
+function announceFinishedJobs(st) {
+  const now = {
+    index: st.index.status, scan: st.scan.status, uber: st.uber.status,
+  };
+  const before = S.jobs;
+  if (before.scan === "running" && now.scan === "done") toast("✓ Wolt-Angebote vollständig geprüft");
+  if (before.uber === "loading" && now.uber === "ok") toast(`✓ Uber Eats geladen: ${num.format(st.uber.count)} Restaurants`);
+  if (before.uber === "loading" && now.uber === "blocked") toast("Uber Eats lässt gerade keine Abrufe zu");
+  if (before.index === "running" && now.index === "done" && S.tab === "dishes" && !atTop()) toast("✓ Alle Lieferando-Speisekarten durchsuchbar");
+  S.jobs = now;
+}
 
-      // Toggle if already loaded (re-render content: list rebuilds empty the container)
-      const cacheKey = `${source}|${slug}`;
-      if (dealItemsCache[cacheKey] !== undefined) {
-        container.classList.toggle('open');
-        if (container.classList.contains('open')) {
-          const cached = dealItemsCache[cacheKey];
-          container.innerHTML = cached.ok
-            ? renderDealItems(cached.offers)
-            : `<div class="deal-items-error">Fehler beim Laden der Gerichte: ${cached.error || 'Unbekannter Fehler'}</div>`;
-          btn.textContent = 'Gerichte ausblenden ▴';
-          expandedCards.add(cacheKey);
-        } else {
-          btn.textContent = 'Gerichte anzeigen ▾';
-          expandedCards.delete(cacheKey);
-        }
-        return;
-      }
+function addList(src, list) {
+  for (const r of list) {
+    const labels = r.cuisines.map(k => (S.cuisines.find(c => c.key === k) || {}).label || "");
+    r._f = fold([r.name, ...(r.tags || []), ...labels].join(" "));
+    S.rest.set(r.id, r);
+  }
+  S.lists[src] = list;
+}
 
-      // Load from API
-      btn.disabled = true;
-      btn.textContent = 'Lädt…';
+// The Wolt venues on screen get their deals checked first (Wolt allows only a few requests per minute)
+function bumpWolt(slugs) {
+  if (!S.area || !slugs.length) return;
+  const key = slugs.join(",");
+  if (key === lastBump) return;
+  clearTimeout(bumpTimer);
+  bumpTimer = setTimeout(async () => {
+    lastBump = key;
+    const res = await api(`/api/area/${S.area}/prioritize`, { method: "POST", body: JSON.stringify({ slugs }) });
+    if (res.ok && res.queued && !S.polling) poll();
+  }, 600);
+}
 
-      try {
-        const response = await fetch(`${API_BASE}/api/deal-items?source=${encodeURIComponent(source)}&slug=${encodeURIComponent(slug)}`);
-        const data = await response.json();
+// ---------- Toolbar ----------
+document.querySelectorAll(".tabs button").forEach(b => b.addEventListener("click", () => setTab(b.dataset.tab)));
+function setTab(tab) {
+  if (S.tab === tab) { window.scrollTo({ top: 0, behavior: "smooth" }); return; }
+  S.tab = tab;
+  document.querySelectorAll(".tabs button").forEach(b => b.setAttribute("aria-selected", String(b.dataset.tab === tab)));
+  $("#q").placeholder = tab === "dishes" ? "Gericht suchen, z. B. Pad Thai, Falafel" : "Restaurant oder Küche suchen";
+  hidePill();
+  renderFilters();
+  render();
+  window.scrollTo({ top: 0 });
+}
 
-        dealItemsCache[cacheKey] = data;
+let qTimer = null;
+$("#q").addEventListener("input", () => {
+  clearTimeout(qTimer);
+  qTimer = setTimeout(() => { S.f.q = $("#q").value.trim(); S.dLimit = 48; S.rLimit = 60; render(); }, 300);
+});
+$("#q").addEventListener("keydown", e => { if (e.key === "Enter") e.target.blur(); });
 
-        if (data.ok) {
-          container.innerHTML = renderDealItems(data.offers);
-          container.classList.add('open');
-          btn.textContent = 'Gerichte ausblenden ▴';
-          expandedCards.add(cacheKey);
-        } else {
-          container.innerHTML = `<div class="deal-items-error">Fehler beim Laden der Gerichte: ${data.error || 'Unbekannter Fehler'}</div>`;
-          container.classList.add('open');
-          btn.textContent = 'Gerichte anzeigen ▾';
-        }
-      } catch (err) {
-        console.error('Deal items fetch error:', err);
-        container.innerHTML = `<div class="deal-items-error">Netzwerkfehler beim Laden der Gerichte</div>`;
-        container.classList.add('open');
-        btn.textContent = 'Gerichte anzeigen ▾';
-      } finally {
-        btn.disabled = false;
-      }
-    }
+const allRestaurants = () => [...(S.lists.lieferando || []), ...(S.lists.wolt || []), ...(S.lists.uber || [])];
+function availableCuisines() {
+  const lists = allRestaurants();
+  if (!lists.length) return S.cuisines.filter(c => c.key !== "shops");
+  const count = {};
+  for (const r of lists) if (r.open_now || !S.f.open) for (const k of r.cuisines) count[k] = (count[k] || 0) + 1;
+  return S.cuisines.filter(c => count[c.key]).map(c => ({ ...c, n: count[c.key] }));
+}
+function renderCuisines() {
+  const el = $("#cuisines");
+  const html = availableCuisines().map(c =>
+    `<button class="cz" data-c="${esc(c.key)}" aria-pressed="${S.f.cuisine === c.key}" title="${c.n ? `${esc(c.label)}: ${c.n} Restaurants` : esc(c.label)}">
+       <span class="ic" aria-hidden="true">${esc(c.emoji)}</span><span class="lb">${esc(c.label)}</span></button>`).join("");
+  if (el.dataset.html !== html) { el.innerHTML = html; el.dataset.html = html; }
+}
+$("#cuisines").addEventListener("click", e => {
+  const b = e.target.closest(".cz");
+  if (!b) return;
+  S.f.cuisine = S.f.cuisine === b.dataset.c ? "" : b.dataset.c;
+  S.dLimit = 48; S.rLimit = 60;
+  renderCuisines(); render();
+});
 
-    function renderDealItems(offers) {
-      if (!offers || offers.length === 0) {
-        return '<div class="offer-no-items">Keine Angebote verfügbar</div>';
-      }
+const CHIPS = [
+  { id: "open", label: "Jetzt geöffnet", on: () => S.f.open, toggle: () => { S.f.open = !S.f.open; } },
+  { id: "deals", label: "🔥 Angebote", on: () => S.f.deals === "any", toggle: () => { S.f.deals = S.f.deals === "any" ? "" : "any"; } },
+  { id: "bogof", label: "2 für 1", on: () => S.f.deals === "bogof", toggle: () => { S.f.deals = S.f.deals === "bogof" ? "" : "bogof"; } },
+  { id: "veg", label: "🥦 Vegetarisch", on: () => S.f.diet === "vegetarian", toggle: () => { S.f.diet = S.f.diet === "vegetarian" ? "" : "vegetarian"; } },
+  { id: "vegan", label: "🌱 Vegan", on: () => S.f.diet === "vegan", toggle: () => { S.f.diet = S.f.diet === "vegan" ? "" : "vegan"; } },
+  { id: "rating", label: "★ 4,5+", tab: "restaurants", on: () => S.f.rating, toggle: () => { S.f.rating = !S.f.rating; } },
+  { id: "freedel", label: "Gratis Lieferung", tab: "restaurants", on: () => S.f.freeDel, toggle: () => { S.f.freeDel = !S.f.freeDel; } },
+];
+const SORTS = {
+  dishes: [["relevance", "Beste Treffer"], ["discount", "Größter Rabatt"], ["price", "Preis aufsteigend"], ["rating", "Beste Bewertung"], ["eta", "Schnellste Lieferung"]],
+  restaurants: [["recommended", "Empfohlen"], ["rating", "Beste Bewertung"], ["eta", "Schnellste Lieferung"], ["distance", "Entfernung"], ["fee", "Liefergebühr"], ["min", "Mindestbestellwert"]],
+};
+function options(list, value) { return list.map(([v, l]) => `<option value="${esc(v)}"${v === value ? " selected" : ""}>${esc(l)}</option>`).join(""); }
+function renderFilters() {
+  const chips = CHIPS.filter(c => !c.tab || c.tab === S.tab)
+    .map(c => `<button class="chip" data-chip="${c.id}" aria-pressed="${c.on()}">${esc(c.label)}</button>`).join("");
+  const sortKey = S.tab === "dishes" ? "sortD" : "sortR";
+  const price = S.tab === "dishes" ? `<select class="chip" data-sel="maxPrice" aria-label="Höchstpreis">${options([["", "Jeder Preis"], ["800", "bis 8 €"], ["1000", "bis 10 €"], ["1200", "bis 12 €"], ["1500", "bis 15 €"], ["2000", "bis 20 €"]], S.f.maxPrice)}</select>` : "";
+  $("#filters").innerHTML = `${chips}<span class="sep"></span>${price}
+    <select class="chip" data-sel="source" aria-label="Anbieter">${options([["", "Alle Anbieter"], ["lieferando", "Nur Lieferando"], ["wolt", "Nur Wolt"], ["uber", "Nur Uber Eats"]], S.f.source)}</select>
+    <select class="chip" data-sel="${sortKey}" aria-label="Sortierung">${options(SORTS[S.tab], S.f[sortKey])}</select>`;
+}
+$("#filters").addEventListener("click", e => {
+  const b = e.target.closest("[data-chip]");
+  if (!b) return;
+  CHIPS.find(c => c.id === b.dataset.chip).toggle();
+  S.dLimit = 48; S.rLimit = 60;
+  // Only the pressed states change; the row itself stays (keeps its horizontal scroll position)
+  for (const el of $("#filters").querySelectorAll("[data-chip]")) el.setAttribute("aria-pressed", String(CHIPS.find(c => c.id === el.dataset.chip).on()));
+  renderCuisines(); render();
+});
+$("#filters").addEventListener("change", e => {
+  const s = e.target.closest("[data-sel]");
+  if (!s) return;
+  S.f[s.dataset.sel] = s.value;
+  S.dLimit = 48; S.rLimit = 60;
+  render();
+});
 
-      return offers
-        .filter(offer => offer.type !== 'stampcard' && offer.type !== 'other')
-        .map(offer => {
-          const badgeClass = offer.type === 'bogof' ? 'bogof' : '';
-          const typeLabels = {
-            bogof: '2 für 1',
-            item_discount: '% auf Gerichte',
-            basket_discount: 'Warenkorb-Rabatt',
-            free_delivery: 'Gratis-Lieferung',
-            free_item: 'Gratis-Artikel'
-          };
-          const badgeText = typeLabels[offer.type] || offer.type;
+// ---------- Status: counts below the filters, running jobs pinned below the search bar ----------
+function renderStatus() {
+  const st = S.status;
+  renderProgress();
+  if (!st) { $("#status").innerHTML = `<span class="it"><span class="spin"></span> Lade Restaurants …</span>`; return; }
+  const parts = ["lieferando", "wolt", "uber"].map(src => {
+    const p = st[src], dot = `<span class="dot ${DOT[src]}"></span>`;
+    if (p.status === "error") return `<span class="it" title="${esc(p.error)}">${dot} ${PROVIDER[src]}: nicht erreichbar</span>`;
+    if (p.status === "blocked") return `<span class="it" title="${esc(p.error)}">${dot} ${PROVIDER[src]}: pausiert</span>`;
+    if (p.status === "loading" && !p.count) return `<span class="it">${dot} ${PROVIDER[src]} lädt …</span>`;
+    return `<span class="it minor">${dot} ${PROVIDER[src]}: ${num.format(p.count)} Restaurants</span>`;
+  });
+  if (st.index.status === "done") parts.push(`<span class="it minor">✓ ${st.index.done - st.index.failed} Lieferando-Speisekarten durchsuchbar</span>`);
+  parts.push(`<button class="linkish" data-limits>ⓘ Einschränkungen</button>`);
+  const html = parts.join("");
+  // Only redraw on change, so a tap on the button is never lost to a refresh
+  if ($("#status").dataset.html !== html) { $("#status").innerHTML = html; $("#status").dataset.html = html; }
+}
+function progressRow(dot, label, done, total, note, warn = false) {
+  const known = total > 0;
+  const pct = known ? Math.min(100, Math.round(done / total * 100)) : 0;
+  return `<div class="pg${warn ? " warn" : ""}"><span class="dot ${dot}"></span><span class="pl">${esc(label)}</span>
+    <span class="bar${known ? "" : " indet"}"><i style="width:${pct}%;background:var(--${{ l: "lief", w: "wolt", u: "uber" }[dot]})"></i></span>
+    <span class="pc">${known ? `${done}/${total}` : ""}</span><span class="pn">${esc(note)}</span></div>`;
+}
+function renderProgress() {
+  const st = S.status, el = $("#progress");
+  if (!st) { el.hidden = true; return; }
+  const rows = [];
+  const ix = st.index, sc = st.scan, ub = st.uber;
+  if (st.lieferando.status === "loading") rows.push(progressRow("l", "Lieferando", 0, 0, "Restaurantliste lädt"));
+  else if (["waiting", "running"].includes(ix.status)) rows.push(progressRow("l", "Lieferando-Speisekarten", ix.done, ix.total, "für die Gerichtesuche – dauert etwa 10 Sekunden"));
+  if (st.wolt.status === "loading") rows.push(progressRow("w", "Wolt", 0, 0, "Restaurantliste lädt"));
+  else if (["waiting", "running"].includes(sc.status) && st.wolt.status === "ok") {
+    rows.push(progressRow("w", "Wolt-Angebote", sc.done, sc.total, sc.throttled
+      ? "Wolt bremst gerade kurz – es geht gleich weiter"
+      : "langsam: Wolt erlaubt nur wenige Abfragen pro Minute · sichtbare Restaurants zuerst", sc.throttled));
+  }
+  if (ub.status === "loading") rows.push(progressRow("u", "Uber Eats", ub.pages, ub.pages_max, "Restaurants und Angebote · Gerichte erst beim Öffnen eines Restaurants"));
+  else if (ub.status === "blocked") rows.push(progressRow("u", "Uber Eats", ub.pages, ub.pages_max, "Uber lässt gerade keine Abrufe zu – Pause 15 Minuten", true));
+  if (!rows.length) { el.hidden = true; return; }
+  $("#pg-rows").innerHTML = rows.join("");
+  el.hidden = false;
+}
+document.addEventListener("click", e => {
+  if (e.target.closest("[data-limits]")) { $("#limits").hidden = !$("#limits").hidden; return; }
+  if (e.target.closest("[data-limits-close]")) $("#limits").hidden = true;
+});
 
-          let itemsHtml = '';
-          if (offer.items && offer.items.length > 0) {
-            itemsHtml = offer.items
-              .map(item => {
-                const itemName = item.name || 'Artikel';
-                const itemPrice = formatCurrency(item.price_cents);
-                let discountBadge = '';
+// ---------- Rendering ----------
+function render() {
+  clearTimeout(S.dishTimer);
+  hidePill();
+  if (S.tab === "restaurants") renderRestaurants(); else refreshDishes();
+}
 
-                if (item.discount_percentage === 100) {
-                  discountBadge = offer.type === 'bogof' ? '2. gratis' : 'gratis';
-                } else if (item.discount_percentage > 0) {
-                  discountBadge = `−${item.discount_percentage} %`;
-                }
+const io = new IntersectionObserver(entries => {
+  if (entries.some(e => e.isIntersecting) && !$("#more").hidden && !$("#more").disabled) $("#more").click();
+}, { rootMargin: "600px" });
+io.observe($("#more"));
+$("#more").addEventListener("click", () => {
+  if (S.tab === "restaurants") { S.rLimit += 60; renderRestaurants(); }
+  else { S.dLimit += 48; $("#more").disabled = true; refreshDishes({ more: true }); }
+});
 
-                return `
-                  <div class="deal-item">
-                    <span class="deal-item-name">${itemName}</span>
-                    <span class="deal-item-price">${itemPrice} €${discountBadge ? ` <span class="deal-item-discount">${discountBadge}</span>` : ''}</span>
-                  </div>
-                `;
-              })
-              .join('');
-          } else {
-            itemsHtml = '<div class="offer-no-items">Gilt für ausgewählte Produkte — Details im Shop</div>';
-          }
+// Restaurants (filtered in the browser)
+function restScore(r) {
+  const deals = r.deals || [];
+  const dealScore = deals.some(d => d.type === "bogof") ? 3 : deals.some(d => d.type !== "stampcard") ? 1.5 : 0;
+  return (r.open_now ? 100 : 0) + dealScore + (r.rating || 3.6) * 1.5 + Math.log10((r.rating_count || 0) + 1) * 0.8 - (r.distance_m || 3000) / 1000 * 0.7;
+}
+function filteredRestaurants() {
+  const f = S.f;
+  const tokens = tokensOf(f.q);
+  const list = allRestaurants().filter(r => {
+    if (f.open && !r.open_now) return false;
+    if (f.source && r.source !== f.source) return false;
+    if (f.cuisine ? !r.cuisines.includes(f.cuisine) : r.shop) return false;
+    if (tokens.some(t => !r._f.includes(t))) return false;
+    if (f.diet === "vegan" && !(r.diet.includes("vegan") || (r.dc && r.dc[0] > 0))) return false;
+    if (f.diet === "vegetarian" && !(r.diet.length || (r.dc && r.dc[1] > 0))) return false;
+    const deals = r.deals || [];
+    if (f.deals === "any" && !deals.some(d => d.type !== "stampcard")) return false;
+    if (f.deals === "bogof" && !deals.some(d => d.type === "bogof" || d.type === "free_item")) return false;
+    if (f.rating && !(r.rating >= 4.5)) return false;
+    if (f.freeDel && !(r.delivery_fee_cents === 0 || deals.some(d => d.type === "free_delivery"))) return false;
+    return true;
+  });
+  const big = 1e9;
+  const sorters = {
+    recommended: (a, b) => restScore(b) - restScore(a),
+    rating: (a, b) => (b.rating || 0) - (a.rating || 0) || (b.rating_count || 0) - (a.rating_count || 0),
+    eta: (a, b) => (a.eta_min ?? big) - (b.eta_min ?? big),
+    distance: (a, b) => (a.distance_m ?? big) - (b.distance_m ?? big),
+    fee: (a, b) => (a.delivery_fee_cents ?? big) - (b.delivery_fee_cents ?? big),
+    min: (a, b) => (a.min_order_cents ?? big) - (b.min_order_cents ?? big),
+  };
+  return list.sort(sorters[f.sortR] || sorters.recommended);
+}
+function restSig(r) {
+  return `${r.open_now}|${r.deals === null ? "?" : (r.deals || []).map(d => d.type).join(".")}|${r.dc ? r.dc.join("-") : ""}|${r.min_order_cents}`;
+}
+function restCard(r) {
+  const deals = sortedDeals(r.deals).filter(d => d.type !== "stampcard");
+  const top = deals[0];
+  const logo = imgUrl(r.logo), cover = imgUrl(r.img);
+  const media = cover ? `<img class="cover" src="${esc(cover)}" alt="" loading="lazy" decoding="async">`
+    : logo ? `<img class="logo-big" src="${esc(logo)}" alt="" loading="lazy" decoding="async">`
+    : `<span class="initial">${esc((r.name || "?").trim().charAt(0).toUpperCase())}</span>`;
+  const fee = r.delivery_fee_cents === 0 ? "Gratis Lieferung" : r.delivery_fee_cents != null ? `Lieferung ${money(r.delivery_fee_cents)}` : "";
+  const min = r.min_order_cents ? `Mind. ${money(r.min_order_cents)}` : "";
+  // One badge per label: two different "2 für 1" offers should not show up twice
+  const labels = [...new Map(deals.map(d => [d.type === "bogof" ? "2 für 1" : d.text.length > 34 ? dealShort(d) : d.text, d])).entries()];
+  const badges = labels.slice(0, 2).map(([label, d]) => `<span class="b deal${d.type === "bogof" ? " hot" : ""}" title="${esc(d.text)}">${esc(label)}</span>`).join("")
+    + (labels.length > 2 ? `<span class="b soft">+${labels.length - 2}</span>` : "")
+    + (r.source === "wolt" && r.deals === null ? `<span class="b soft" title="Wolt-Angebote werden nach und nach geprüft">Angebote: werden geprüft</span>` : "")
+    + (r.dc && r.dc[0] ? `<span class="b vegan">🌱 ${r.dc[0]} vegan</span>` : r.diet.includes("vegan") ? `<span class="b vegan">🌱 vegane Auswahl</span>` : "")
+    + (r.dc && !r.dc[0] && r.dc[1] ? `<span class="b veg">🥦 ${r.dc[1]} vegetarisch</span>` : "");
+  return `<button class="card rcard${r.open_now ? "" : " closed"}" data-rest="${esc(r.id)}">
+    <div class="media">${media}
+      <span class="src ${r.source}">${PROVIDER[r.source]}</span>
+      ${top && (top.type === "bogof" || top.type === "free_item") ? `<span class="ribbon">2 für 1</span>` : ""}
+      ${r.open_now ? "" : `<span class="closed-label">${esc(opensAt(r))}</span>`}
+    </div>
+    <div class="body">
+      <div class="title">${cover && logo ? `<img src="${esc(logo)}" alt="" loading="lazy">` : ""}<h3>${esc(r.name)}</h3></div>
+      <div class="meta">${rating(r)}${eta(r) ? `<span>${eta(r)}</span>` : ""}${r.distance_m != null ? `<span>${dist(r.distance_m)}</span>` : ""}</div>
+      <div class="meta">${fee ? `<span>${fee}</span>` : ""}${min ? `<span>${min}</span>` : ""}</div>
+      <div class="tags">${esc((r.tags || []).join(" · "))}</div>
+      <div class="badges">${badges}</div>
+    </div>
+  </button>`;
+}
+function renderRestaurants({ fromPoll = false } = {}) {
+  if (S.tab !== "restaurants") return;
+  const loadingAny = S.status && ["lieferando", "wolt", "uber"].some(s => S.status[s].status === "loading");
+  if (!S.lists.lieferando && !S.lists.wolt && !S.lists.uber) {
+    $("#summary").innerHTML = "";
+    $("#results").innerHTML = `<div class="grid">${'<div class="sk"></div>'.repeat(6)}</div>`;
+    $("#more").hidden = true;
+    return;
+  }
+  const list = filteredRestaurants();
+  const shown = list.slice(0, S.rLimit);
+  const withDeals = list.filter(r => (r.deals || []).some(d => d.type !== "stampcard")).length;
+  $("#summary").innerHTML = `<h2>${num.format(list.length)} Restaurants</h2><span class="note">${num.format(withDeals)} mit Angeboten${loadingAny ? " · weitere laden noch" : ""}</span>`;
+  bumpWolt(shown.slice(0, 40).filter(r => r.source === "wolt" && r.deals === null).map(r => r.slug));
+  if (!list.length) {
+    $("#results").innerHTML = `<div class="empty"><b>Keine Restaurants gefunden</b>Filter lockern oder „Jetzt geöffnet“ ausschalten.
+      ${S.f.q ? `<p><button class="btn ghost" data-tab-switch="dishes">„${esc(S.f.q)}“ bei den Gerichten suchen</button></p>` : ""}</div>`;
+    $("#more").hidden = true;
+    return;
+  }
+  const entries = shown.map(r => ({ key: r.id, sig: restSig(r), html: restCard(r) }));
+  const keys = entries.map(e => e.key).join(",");
+  if (fromPoll && !atTop() && shownKeys() && keys !== shownKeys()) {
+    // Scrolled down: update badges in place, re-sort only when asked
+    patchGrid("rests", entries, { reorder: false });
+    showPill(() => renderRestaurants());
+  } else {
+    patchGrid("rests", entries);
+  }
+  $("#more").hidden = shown.length >= list.length;
+  $("#more").disabled = false;
+}
 
-          return `
-            <div class="deal-offer">
-              <div class="offer-header">
-                <span class="deal-badge ${badgeClass}">${badgeText}</span>
-              </div>
-              ${offer.text ? `<div class="offer-text">${offer.text}</div>` : ''}
-              ${itemsHtml}
-            </div>
-          `;
-        })
-        .join('');
-    }
+// Dishes (searched on the server)
+function dishParams() {
+  const f = S.f, p = new URLSearchParams();
+  if (f.q) p.set("q", f.q);
+  if (f.cuisine) p.set("cuisine", f.cuisine);
+  if (f.diet) p.set("diet", f.diet);
+  if (f.deals) p.set("deals", f.deals);
+  if (f.source) p.set("source", f.source);
+  if (f.maxPrice) p.set("max_price", f.maxPrice);
+  p.set("open", f.open ? "1" : "0");
+  p.set("sort", f.sortD);
+  p.set("limit", String(S.dLimit));
+  return p.toString();
+}
+async function refreshDishes({ quiet = false, more = false } = {}) {
+  clearTimeout(S.dishTimer);
+  if (!S.area) return;
+  if (S.dishCtrl) S.dishCtrl.abort();
+  const ctrl = S.dishCtrl = new AbortController();
+  const params = dishParams();
+  if (!quiet && !more && !$("#results .grid.dishes .card")) {
+    $("#summary").innerHTML = "";
+    $("#results").innerHTML = `<div class="grid dishes">${'<div class="sk"></div>'.repeat(4)}</div>`;
+  }
+  const res = await api(`/api/area/${S.area}/dishes?${params}`, { signal: ctrl.signal });
+  if (res.aborted || ctrl !== S.dishCtrl) return;
+  $("#more").disabled = false;
+  if (!res.ok) {
+    if (res.expired) { createArea(); return; }
+    appMsg(res.error || "Suche fehlgeschlagen");
+    return;
+  }
+  appMsg("");
+  const changedKeys = res.items.map(i => `${i.rest.id}/${i.id}`).join(",") !== shownKeys();
+  if (quiet && changedKeys && !atTop() && shownKeys()) {
+    // New hits while the user is scrolling: offer them instead of moving the list
+    showPill(() => { S.dish = res; renderDishes(); window.scrollTo({ top: 0, behavior: "smooth" }); });
+    renderDishSummary(res);
+  } else {
+    S.dish = res;
+    whenIdle(renderDishes);
+  }
+  const pending = ["loading", "waiting"].includes(res.wolt.state) || ["running", "waiting"].includes(res.index.status);
+  if (pending && S.tab === "dishes") S.dishTimer = setTimeout(() => refreshDishes({ quiet: true }), res.wolt.state === "loading" ? 1500 : 3000);
+}
+function dishCard(it) {
+  const r = S.rest.get(it.rest.id) || it.rest;
+  const pic = imgUrl(it.img);
+  const logo = imgUrl(r.logo);
+  const deal = it.deal;
+  return `<button class="card dcard" data-rest="${esc(r.id)}" data-item="${esc(it.id)}">
+    <div class="txt">
+      <h3>${esc(it.name)}</h3>
+      ${it.desc ? `<p class="desc">${esc(it.desc)}</p>` : ""}
+      <div class="price">${it.price_from ? `<span class="from">ab </span>` : ""}${money(it.price_cents)}${it.orig_price_cents ? `<s>${money(it.orig_price_cents)}</s>` : ""}</div>
+      <div class="badges">${pic ? "" : dealBadge(deal)}${dietBadge(it)}</div>
+      ${it.more_in_rest ? `<div class="more-in">+${it.more_in_rest} weitere Treffer hier</div>` : ""}
+      <div class="rest-line">${logo ? `<img src="${esc(logo)}" alt="" loading="lazy">` : ""}<span class="dot ${DOT[r.source] || "l"}" title="${PROVIDER[r.source]}"></span>
+        <span class="rn">${esc(r.name)}</span>${r.rating ? `<span>★ ${String(r.rating).replace(".", ",")}</span>` : ""}${r.eta ? `<span>${esc(eta(r))}</span>` : ""}${r.open_now === false ? "<span>· geschlossen</span>" : ""}</div>
+    </div>
+    ${pic ? `<div class="pic"><img src="${esc(pic)}" alt="" loading="lazy" decoding="async">${dealBadge(deal)}</div>` : ""}
+  </button>`;
+}
+function woltNote(w) {
+  const q = w.query ? `„${esc(w.query)}“` : "";
+  switch (w.state) {
+    case "loading": return `<span class="spin"></span> Wolt sucht nach ${q} …`;
+    case "waiting": return "Wolt lädt noch …";
+    case "done": return `inkl. Wolt-Treffern für ${q}`;
+    case "throttled": return "Wolt bremst gerade – Wolt-Treffer folgen beim nächsten Versuch";
+    case "error": return "Wolt-Suche fehlgeschlagen";
+    default: return S.f.source === "lieferando" ? "" : "Wolt-Gerichte erscheinen, sobald du etwas suchst oder eine Küche wählst";
+  }
+}
+function renderDishSummary(d) {
+  const notes = [];
+  if (d.diet && !S.f.diet) notes.push(d.diet === "vegan" ? "🌱 nur vegan" : "🥦 nur vegetarisch");
+  if (S.f.diet === "vegetarian" || d.diet === "vegetarian") notes.push("vegetarisch = gekennzeichnet oder anhand der Zutaten vermutet");
+  const wn = woltNote(d.wolt);
+  if (wn) notes.push(wn);
+  if (["running", "waiting"].includes(d.index.status)) notes.push("weitere Speisekarten laden noch");
+  $("#summary").innerHTML = `<h2>${num.format(d.matches)} Gerichte${d.restaurants ? ` in ${num.format(d.restaurants)} Restaurants` : ""}</h2><span class="note">${notes.join(" · ")}</span>`;
+}
+function renderDishes() {
+  const d = S.dish;
+  if (!d || S.tab !== "dishes") return;
+  renderDishSummary(d);
+  const wolt = [...new Set(d.items.filter(i => i.rest.source === "wolt" && (S.rest.get(i.rest.id) || {}).deals === null).map(i => i.rest.slug))];
+  bumpWolt(wolt.slice(0, 40));
+  if (!d.items.length) {
+    const indexing = ["running", "waiting"].includes(d.index.status);
+    $("#results").innerHTML = indexing ? `<div class="grid dishes">${'<div class="sk"></div>'.repeat(4)}</div>`
+      : d.closed_matches ? `<div class="empty"><b>Gerade nichts geöffnet</b>${num.format(d.closed_matches)} Treffer bei Restaurants, die gerade geschlossen haben.
+          <p><button class="btn ghost" data-show-closed>Auch geschlossene zeigen</button></p></div>`
+      : `<div class="empty"><b>Nichts gefunden</b>Anderen Suchbegriff probieren oder Filter lockern.</div>`;
+  } else {
+    patchGrid("dishes", d.items.map(it => ({
+      key: `${it.rest.id}/${it.id}`,
+      sig: `${(it.deal || {}).type}|${(it.deal || {}).pct}|${it.more_in_rest}|${it.price_cents}|${(S.rest.get(it.rest.id) || it.rest).open_now}`,
+      html: dishCard(it),
+    })));
+  }
+  $("#more").hidden = d.items.length >= d.total;
+}
 
-    init();
-  </script>
+$("#results").addEventListener("click", e => {
+  const sw = e.target.closest("[data-tab-switch]");
+  if (sw) { setTab(sw.dataset.tabSwitch); return; }
+  if (e.target.closest("[data-show-closed]")) { S.f.open = false; renderFilters(); render(); return; }
+  const card = e.target.closest("[data-rest]");
+  if (card) openRestaurant(card.dataset.rest, card.dataset.item || null);
+});
+
+// ---------- Drawer: full menu (the phone's back button closes it) ----------
+const drawer = $("#drawer"), backdrop = $("#backdrop");
+let lastFocus = null;
+function closeDrawer(fromHistory = false) {
+  if (!S.drawer) return;
+  drawer.classList.remove("open"); backdrop.classList.remove("open");
+  document.body.classList.remove("locked");
+  setTimeout(() => { if (!drawer.classList.contains("open")) drawer.hidden = true; }, 260);
+  S.drawer = null;
+  if (!fromHistory && history.state && history.state.drawer) history.back();
+  if (lastFocus) lastFocus.focus({ preventScroll: true });
+}
+window.addEventListener("popstate", () => closeDrawer(true));
+backdrop.addEventListener("click", () => closeDrawer());
+$("#dclose").addEventListener("click", () => closeDrawer());
+document.addEventListener("keydown", e => { if (e.key === "Escape" && S.drawer) closeDrawer(); });
+
+async function openRestaurant(id, focusItem) {
+  let r = S.rest.get(id);
+  if (!r && S.dish) { const hit = S.dish.items.find(i => i.rest.id === id); if (hit) r = { ...hit.rest, tags: [], cuisines: [], diet: [], deals: null }; }
+  if (!r) return;
+  lastFocus = document.activeElement;
+  const wasOpen = !!S.drawer;
+  S.drawer = { r, menu: null, q: "", diet: S.f.diet, deals: false, focus: focusItem, error: null };
+  if (!wasOpen) history.pushState({ drawer: true }, "");
+  drawer.hidden = false;
+  requestAnimationFrame(() => { drawer.classList.add("open"); backdrop.classList.add("open"); });
+  document.body.classList.add("locked");
+  $("#dscroll").scrollTop = 0;
+  renderDrawer();
+  $("#dclose").focus({ preventScroll: true });
+  await loadMenu();
+}
+async function loadMenu() {
+  const dr = S.drawer;
+  if (!dr) return;
+  dr.error = null;
+  const r = dr.r;
+  const res = await api(`/api/menu?source=${r.source}&slug=${encodeURIComponent(r.slug)}&area=${S.area || ""}`);
+  if (S.drawer !== dr) return;
+  if (!res.ok) { dr.error = res.error || "Speisekarte nicht verfügbar"; renderDrawer(); return; }
+  dr.menu = res;
+  if (r.source === "wolt" && r.deals === null) { r.deals = res.offers; if (res.min_order_cents != null) r.min_order_cents = res.min_order_cents; }
+  if (r.source === "uber" && res.cuisines) {
+    // The Uber list knows no cuisines; the menu does - keeps cuisine chips and search right afterwards
+    r.cuisines = [...new Set([...(r.cuisines || []), ...res.cuisines])];
+    if (!(r.tags || []).length && res.tags) r.tags = res.tags;
+    r._f = fold([r.name, ...(r.tags || []), ...r.cuisines.map(k => (S.cuisines.find(c => c.key === k) || {}).label || "")].join(" "));
+  }
+  renderDrawer();
+  if (dr.focus) {
+    // Wolt's search uses other item ids than the menu, so fall back to the dish name
+    const hit = S.dish && S.dish.items.find(i => i.id === dr.focus && i.rest.id === r.id);
+    let el = document.getElementById(`mi-${CSS.escape(dr.focus)}`);
+    if (!el && hit) el = [...document.querySelectorAll("#dmenu .mi")].find(x => $(".n", x).textContent === hit.name);
+    if (el) { el.scrollIntoView({ block: "center" }); el.classList.add("focus"); }
+    dr.focus = null;
+  }
+}
+function menuItem(it) {
+  const pic = imgUrl(it.img);
+  return `<div class="mi${it.sold_out ? " soldout" : ""}" id="mi-${esc(it.id)}">
+    <div class="t"><div class="n">${esc(it.name)}</div>${it.desc ? `<div class="d">${esc(it.desc)}</div>` : ""}
+      <div class="price">${it.price_from ? `<span class="from">ab </span>` : ""}${money(it.price_cents)}${it.orig_price_cents ? `<s>${money(it.orig_price_cents)}</s>` : ""}${it.sold_out ? ` <span class="b soft">ausverkauft</span>` : ""}</div>
+      <div class="badges">${dealBadge(it.deal)}${dietBadge(it)}</div></div>
+    ${pic ? `<img src="${esc(pic)}" alt="" loading="lazy" decoding="async">` : ""}</div>`;
+}
+function drawerMenuHtml() {
+  const dr = S.drawer, m = dr.menu;
+  const tokens = tokensOf(dr.q);
+  const keep = it => (!dr.diet || (dr.diet === "vegan" ? it.diet === "vegan" : !!it.diet))
+    && (!dr.deals || it.deal) && tokens.every(t => fold(`${it.name} ${it.desc}`).includes(t));
+  const sections = [];
+  const dealItems = [], seen = new Set();
+  for (const c of m.categories) for (const it of c.items) if (it.deal && !seen.has(it.id)) { seen.add(it.id); dealItems.push(it); }
+  const dealsShown = dealItems.filter(keep);
+  if (dealsShown.length && !dr.deals) sections.push({ name: "Angebote", items: dealsShown, key: "angebote" });
+  m.categories.forEach((c, i) => {
+    const items = c.items.filter(keep);
+    if (items.length) sections.push({ name: c.name || "Weitere", items, key: `c${i}` });
+  });
+  if (!sections.length) return { nav: "", body: `<div class="empty"><b>Keine passenden Gerichte</b>Filter in der Speisekarte lockern.</div>` };
+  return {
+    nav: sections.map(s => `<button data-jump="${s.key}">${esc(s.name)}</button>`).join(""),
+    body: sections.map(s => `<h3 id="sec-${s.key}">${esc(s.name)}</h3>${s.items.map(menuItem).join("")}`).join(""),
+  };
+}
+function renderDrawer() {
+  const dr = S.drawer;
+  if (!dr) return;
+  const r = dr.r, m = dr.menu;
+  const cover = imgUrl(m && m.banner) || imgUrl(r.img), logo = imgUrl(r.logo);
+  const link = linkUrl(r.link);
+  const offers = sortedDeals(m ? m.offers : r.deals).filter((d, i, a) => a.findIndex(x => x.text === d.text) === i);
+  const minOrder = (m && m.min_order_cents) || r.min_order_cents;
+  const fee = r.delivery_fee_cents === 0 ? "Gratis Lieferung" : r.delivery_fee_cents != null ? `Lieferung ${money(r.delivery_fee_cents)}` : "";
+  const menu = m ? drawerMenuHtml() : null;
+  const keepScroll = $("#dscroll").scrollTop;
+  $("#dscroll").innerHTML = `
+    <div class="dhero">${cover ? `<img class="cover" src="${esc(cover)}" alt="">` : logo ? `<img class="logo-big" src="${esc(logo)}" alt="">` : ""}
+      <span class="src ${r.source}">${PROVIDER[r.source]}</span></div>
+    <div class="dinfo">
+      <h2 id="d-name">${esc(r.name)}</h2>
+      <div class="meta">${rating(r)}${eta(r) ? `<span>${eta(r)}</span>` : ""}${r.distance_m != null ? `<span>${dist(r.distance_m)}</span>` : ""}${fee ? `<span>${fee}</span>` : ""}${minOrder ? `<span>Mind. ${money(minOrder)}</span>` : ""}${r.open_now === false ? `<span>${esc(opensAt(r))}</span>` : ""}</div>
+      ${(r.tags || []).length ? `<div class="tags">${esc(r.tags.join(" · "))}</div>` : ""}
+      ${m && m.description ? `<p class="note">${esc(m.description)}</p>` : ""}
+      ${offers.length ? `<div class="offers">${offers.map(o => `<div class="offer"><b>${esc(dealShort(o))}</b> · ${esc(o.text)}</div>`).join("")}</div>` : ""}
+    </div>
+    <div class="dtools">
+      <div class="row">
+        <input id="mq" type="search" placeholder="In der Speisekarte suchen" value="${esc(dr.q)}" aria-label="In der Speisekarte suchen" enterkeyhint="search">
+      </div>
+      <div class="dcats">
+        <button data-dfilter="vegetarian" class="chip" aria-pressed="${dr.diet === "vegetarian"}">🥦 Vegetarisch</button>
+        <button data-dfilter="vegan" class="chip" aria-pressed="${dr.diet === "vegan"}">🌱 Vegan</button>
+        <button data-dfilter="deals" class="chip" aria-pressed="${dr.deals}">🔥 Angebote</button>
+      </div>
+      ${menu && menu.nav ? `<nav class="dnav" id="dnav" aria-label="Kategorien">${menu.nav}</nav>` : ""}
+    </div>
+    <div class="dmenu" id="dmenu">${dr.error ? `<div class="empty"><b>${esc(dr.error)}</b><button class="btn ghost" data-retry>Erneut versuchen</button></div>`
+      : menu ? menu.body : '<div class="sk" style="margin-top:16px"></div><div class="sk" style="margin-top:12px"></div>'}</div>`;
+  $("#dscroll").scrollTop = keepScroll;
+  $("#dfoot").hidden = !link;
+  $("#dfoot").innerHTML = link ? `<a class="cta ${r.source}" href="${esc(link)}" target="_blank" rel="noopener noreferrer">Bei ${PROVIDER[r.source]} bestellen ↗</a>` : "";
+}
+function rerenderMenuOnly() {
+  const menu = drawerMenuHtml();
+  const nav = $("#dnav");
+  if (nav) nav.innerHTML = menu.nav;
+  $("#dmenu").innerHTML = menu.body;
+}
+$("#dscroll").addEventListener("click", e => {
+  const dr = S.drawer;
+  if (!dr) return;
+  if (e.target.closest("[data-retry]")) { renderDrawer(); loadMenu(); return; }
+  const f = e.target.closest("[data-dfilter]");
+  if (f) {
+    const k = f.dataset.dfilter;
+    if (k === "deals") dr.deals = !dr.deals; else dr.diet = dr.diet === k ? "" : k;
+    document.querySelectorAll("[data-dfilter]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.dfilter === "deals" ? dr.deals : dr.diet === b.dataset.dfilter)));
+    if (dr.menu) rerenderMenuOnly();
+    return;
+  }
+  const j = e.target.closest("[data-jump]");
+  if (j) { const sec = document.getElementById(`sec-${j.dataset.jump}`); if (sec) sec.scrollIntoView({ behavior: "smooth", block: "start" }); }
+});
+let mqTimer = null;
+$("#dscroll").addEventListener("input", e => {
+  if (e.target.id !== "mq" || !S.drawer) return;
+  clearTimeout(mqTimer);
+  mqTimer = setTimeout(() => { S.drawer.q = e.target.value; if (S.drawer.menu) rerenderMenuOnly(); }, 200);
+});
+$("#dscroll").addEventListener("keydown", e => { if (e.target.id === "mq" && e.key === "Enter") e.target.blur(); });
+
+// ---------- Start ----------
+const saved = store.get("dealradar.addr");
+if (saved) { $("#addr").value = saved; $("#addr-form").requestSubmit(); }
+</script>
 </body>
 </html>
