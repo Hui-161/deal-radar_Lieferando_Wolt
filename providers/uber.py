@@ -105,12 +105,18 @@ def _normalize_store(store: dict, lat: float, lon: float) -> Optional[dict]:
     action = store.get("actionUrl") or ""
     payload = ((store.get("tracking") or {}).get("storePayload")) or {}
     state = payload.get("storeAvailablityState") or ""
-    if not uuid or state == "TOO_FAR_TO_DELIVER" or "diningMode=PICKUP" in action:
+    meta = store.get("meta") or []
+    # The delivery-time badge is what the website shows: "18 Min." = deliverable now,
+    # anything else ("Öffnet um …") = not now. storeAvailablityState is no help here: the website's
+    # own feed reports NOT_ACCEPTING_ORDERS for restaurants that take orders (checked 01.11.2026).
+    etd_text = (next((m.get("text") for m in meta if m.get("badgeType") == "ETD"), "") or "").strip()
+    if not uuid or state == "TOO_FAR_TO_DELIVER" or "diningMode=PICKUP" in action or "zu weit" in etd_text.lower():
         return None
     name = ((store.get("title") or {}).get("text") or "").strip()
-    meta = store.get("meta") or []
     eta_range = (payload.get("etdInfo") or {}).get("dropoffETARange") or {}
     eta = f"{eta_range['min']}-{eta_range['max']}" if eta_range.get("min") and eta_range.get("max") else ""
+    deliverable = bool(re.search(r"\d+\s*min", etd_text, re.I)) if etd_text else bool(eta)
+    open_now = bool(payload.get("isOrderable", True)) and deliverable
     fee_text = next((m.get("text") for m in meta if m.get("badgeType") == "FARE"), "")
     rating = (payload.get("ratingInfo") or {}).get("storeRatingScore")
     marker = store.get("mapMarker") or {}
@@ -139,8 +145,9 @@ def _normalize_store(store: dict, lat: float, lon: float) -> Optional[dict]:
         "eta_min": eta_range.get("min"),
         "delivery_fee_cents": food.euro_cents(fee_text) if fee_text else None,
         "min_order_cents": None,
-        "open_now": bool(payload.get("isOrderable", True)) and state not in ("NOT_ACCEPTING_ORDERS", "CLOSED", "UNAVAILABLE"),
+        "open_now": open_now,
         "opens_at": None,
+        "closed_label": None if open_now else (etd_text or "Derzeit keine Lieferung"),
         "distance_m": food.distance_m(lat, lon, marker.get("latitude"), marker.get("longitude")),
         "is_new": any(m.get("badgeType") == "NEW_STORE" for m in meta),
         "badges": [m.get("text") for m in meta if m.get("badgeType") == "EXCLUSIVE_STORE" and m.get("text")][:1],

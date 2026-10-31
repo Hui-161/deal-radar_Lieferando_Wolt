@@ -460,6 +460,7 @@ function eta(r) { return r.eta ? `${r.eta.replace("-", "–")} Min.` : ""; }
 function dist(m) { return m == null ? "" : m < 1000 ? `${Math.round(m / 10) * 10} m` : `${(m / 1000).toFixed(1).replace(".", ",")} km`; }
 function rating(r) { return r.rating ? `<span class="star">${String(r.rating.toFixed ? r.rating.toFixed(1) : r.rating).replace(".", ",")}</span>${r.rating_count ? ` (${num.format(r.rating_count)})` : ""}` : ""; }
 function opensAt(r) {
+  if (r.closed_label) return r.closed_label;
   if (!r.opens_at) return "Geschlossen";
   const d = new Date(r.opens_at);
   if (isNaN(d)) return "Geschlossen";

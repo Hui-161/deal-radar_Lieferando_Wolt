@@ -170,6 +170,9 @@ Besteck, Preis < 0,50 € → `extra`. Ohne Suchwort zeigt die Suche nur `food`.
   tracking.storePayload {etdInfo.dropoffETARange, ratingInfo, isOrderable, storeAvailablityState}}`.
   Weitere Seiten mit `pageInfo: {offset: data.meta.offset, pageSize: 80}` solange `meta.hasMore`.
   Keine Küche pro Restaurant (nur eine Filterliste) → Küche am Namen erkannt.
+  **Lieferbar** = Abzeichen `badgeType: ETD` mit Minuten („18 Min."); „Zu weit entfernt" → weglassen;
+  anderer Text oder keins → derzeit keine Lieferung (`closed_label`). `storeAvailablityState` taugt
+  dafür nicht: Es steht auch im Feed der Webseite bei bestellbaren Restaurants auf `NOT_ACCEPTING_ORDERS`.
 - **Speisekarte:** `POST …/_p/api/getStoreV1` Body `{storeUuid, diningMode: "DELIVERY", time: {asap: true}}`
   → `catalogSectionsMap[sectionUuid][].payload.standardItemsPayload {title.text, catalogItems[]}`,
   Reihenfolge über `sections[].uuid`; Gericht `{uuid, title, itemDescription, price (Cent, ggf.
